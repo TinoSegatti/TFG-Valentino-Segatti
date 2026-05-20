@@ -1,0 +1,21 @@
+name: api-ml CI
+
+on:
+  push:
+    paths: ['services/api-ml/**', '.github/workflows/api-ml-ci.yml']
+  pull_request:
+    paths: ['services/api-ml/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api-ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: pytest -q

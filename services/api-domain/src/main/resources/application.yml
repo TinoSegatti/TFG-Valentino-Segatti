@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: reforma-api-domain
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+reforma:
+  jwt:
+    secret: ${JWT_SECRET:dev_jwt_secret_minimo_64_caracteres_para_desarrollo_local_reforma_2026}
+    expiration-hours: 24
+  ml:
+    base-url: ${ML_BASE_URL:http://localhost:8081}
+    secret: ${JWT_ML_SECRET:dev_ml_jwt_secret_minimo_64_caracteres_compartido_domain_ml}
+  frontend-url: ${FRONTEND_URL:http://localhost:4200}

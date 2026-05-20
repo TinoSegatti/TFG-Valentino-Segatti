@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.java linguist-language=Java
+*.py linguist-language=Python
+*.ts linguist-language=TypeScript
+*.html linguist-language=HTML
+*.css linguist-language=CSS
+*.sql linguist-language=SQL
+
+# Diff amigable para lockfiles enormes
+apps/web/package-lock.json -diff

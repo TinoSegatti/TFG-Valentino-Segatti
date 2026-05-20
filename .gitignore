@@ -1,0 +1,60 @@
+# =========================================
+#  REFORMA / TFG-Valentino-Segatto — .gitignore
+# =========================================
+
+# --- Entorno / secrets ---
+.env
+.env.local
+*.env
+!.env.example
+!**/.env.example
+
+# --- Documentos de contexto interno (no se publican) ---
+CONTEXTO_AGENTE_IA.md
+
+# --- Java / Maven (api-domain) ---
+services/api-domain/target/
+services/api-domain/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.log
+hs_err_pid*.log
+
+# --- Python (api-ml) ---
+services/api-ml/.venv/
+services/api-ml/__pycache__/
+services/api-ml/**/__pycache__/
+services/api-ml/.pytest_cache/
+services/api-ml/.mypy_cache/
+services/api-ml/.ruff_cache/
+services/api-ml/models_store/
+*.pyc
+*.pyo
+
+# --- Node / Angular (web) ---
+apps/web/node_modules/
+apps/web/dist/
+apps/web/.angular/
+apps/web/coverage/
+apps/web/.nx/
+
+# --- IDE / editores ---
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+
+# --- Docker / volúmenes locales ---
+docker-data/
+postgres_data/
+
+# --- SO ---
+Thumbs.db
+ehthumbs.db
+
+# --- Archivos temporales del repo ---
+*.tmp
+*.bak

@@ -1,0 +1,22 @@
+name: api-domain CI
+
+on:
+  push:
+    paths: ['services/api-domain/**', '.github/workflows/api-domain-ci.yml']
+  pull_request:
+    paths: ['services/api-domain/**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/api-domain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: mvn -B test package

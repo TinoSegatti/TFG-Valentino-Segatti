@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/reforma}
+    username: ${SPRING_DATASOURCE_USERNAME:reforma}
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me_local}
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.reforma: DEBUG
+    org.springframework.security: INFO
