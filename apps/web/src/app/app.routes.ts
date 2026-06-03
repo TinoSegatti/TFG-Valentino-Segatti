@@ -36,6 +36,20 @@ export const routes: Routes = [
             (m) => m.MateriasPrimasComponent,
           ),
       },
+      {
+        path: 'proveedores',
+        loadComponent: () =>
+          import('./features/granja/proveedores/proveedores.component').then(
+            (m) => m.ProveedoresComponent,
+          ),
+      },
+      {
+        path: 'animales',
+        loadComponent: () =>
+          import('./features/granja/animales/animales.component').then(
+            (m) => m.AnimalesComponent,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

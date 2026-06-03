@@ -1,5 +1,6 @@
 export interface MateriaPrima {
-  id: string;
+  /** PK autoincremental (BD). Distinto del código de negocio. */
+  id: number;
   idGranja: string;
   codigoMateriaPrima: string;
   nombreMateriaPrima: string;
