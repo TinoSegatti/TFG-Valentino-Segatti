@@ -2,7 +2,6 @@ package com.reforma.domain.config;
 
 import com.reforma.domain.common.domain.PlanSuscripcion;
 import com.reforma.domain.common.domain.TipoUsuario;
-import com.reforma.domain.common.util.IdGenerator;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.usuarios.entity.Usuario;

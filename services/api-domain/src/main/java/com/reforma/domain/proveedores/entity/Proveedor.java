@@ -1,4 +1,4 @@
-package com.reforma.domain.materiasprimas.entity;
+package com.reforma.domain.proveedores.entity;
 
 import com.reforma.domain.granjas.entity.Granja;
 import jakarta.persistence.Column;
@@ -17,15 +17,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Proveedor de materias primas — Sprint 2 (RF-PROV-001 / RF-PROV-002).
+ * Multi-tenant por {@code id_granja}; el código es único dentro de la granja.
+ */
 @Entity
-@Table(name = "t_materia_prima")
-// id: PK BIGINT autoincremental (único e irrepetible). codigo_materia_prima: clave de negocio/UI (única entre activas, V003).
+@Table(name = "t_proveedor")
+// id: PK BIGINT autoincremental. codigo_proveedor: clave de negocio/UI (única entre activos, V003).
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MateriaPrima {
+public class Proveedor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,17 +39,32 @@ public class MateriaPrima {
     @JoinColumn(name = "id_granja", nullable = false)
     private Granja granja;
 
-    @Column(name = "codigo_materia_prima", nullable = false, length = 50)
-    private String codigoMateriaPrima;
+    @Column(name = "codigo_proveedor", nullable = false, length = 50)
+    private String codigoProveedor;
 
-    @Column(name = "nombre_materia_prima", nullable = false, length = 200)
-    private String nombreMateriaPrima;
+    @Column(name = "nombre_proveedor", nullable = false, length = 200)
+    private String nombreProveedor;
 
-    @Column(name = "precio_por_kilo", nullable = false)
-    private Double precioPorKilo;
+    @Column(length = 50)
+    private String telefono;
+
+    @Column(length = 200)
+    private String email;
+
+    @Column(length = 20)
+    private String cuit;
+
+    @Column(columnDefinition = "TEXT")
+    private String direccion;
+
+    @Column(length = 100)
+    private String localidad;
+
+    @Column(columnDefinition = "TEXT")
+    private String notas;
 
     @Column(nullable = false)
-    private Boolean activa;
+    private Boolean activo;
 
     @Column(name = "fecha_creacion", nullable = false)
     private Instant fechaCreacion;

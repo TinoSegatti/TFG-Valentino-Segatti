@@ -9,7 +9,8 @@ help:
 	@echo "  make ps           Estado de contenedores"
 	@echo "  make restart      Reinicia api-domain, api-ml y web"
 	@echo ""
-	@echo "  make test-domain  Tests Maven (api-domain)"
+	@echo "  make test-domain     Tests unitarios api-domain (Docker + Maven)"
+	@echo "  make test-domain-it  Tests integracion catalogos (-Pit, requiere Docker)"
 	@echo "  make test-ml      Tests pytest (api-ml)"
 	@echo "  make migrate      Flyway + Alembic"
 	@echo "  make seed         Carga datos demo en BD local"
@@ -36,7 +37,22 @@ restart:
 	docker compose restart api-domain api-ml web
 
 test-domain:
-	cd services/api-domain && mvn test
+	docker run --rm \
+		-v "$(CURDIR)/services/api-domain:/app" \
+		-v reforma_m2_cache:/root/.m2 \
+		-w /app \
+		maven:3.9-eclipse-temurin-21-alpine \
+		mvn -B test
+
+test-domain-it:
+	docker run --rm \
+		-v "$(CURDIR)/services/api-domain:/app" \
+		-v reforma_m2_cache:/root/.m2 \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e DOCKER_HOST=unix:///var/run/docker.sock \
+		-w /app \
+		maven:3.9-eclipse-temurin-21-alpine \
+		mvn -B test -Pit
 
 test-ml:
 	cd services/api-ml && python -m pytest -q

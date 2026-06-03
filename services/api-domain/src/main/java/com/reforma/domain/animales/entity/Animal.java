@@ -1,4 +1,4 @@
-package com.reforma.domain.materiasprimas.entity;
+package com.reforma.domain.animales.entity;
 
 import com.reforma.domain.granjas.entity.Granja;
 import jakarta.persistence.Column;
@@ -18,14 +18,14 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "t_materia_prima")
-// id: PK BIGINT autoincremental (único e irrepetible). codigo_materia_prima: clave de negocio/UI (única entre activas, V003).
+@Table(name = "t_animal")
+// id: PK BIGINT autoincremental. codigo_animal: clave de negocio/UI (única entre activos, V004).
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MateriaPrima {
+public class Animal {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,17 +35,22 @@ public class MateriaPrima {
     @JoinColumn(name = "id_granja", nullable = false)
     private Granja granja;
 
-    @Column(name = "codigo_materia_prima", nullable = false, length = 50)
-    private String codigoMateriaPrima;
+    @Column(name = "codigo_animal", nullable = false, length = 50)
+    private String codigoAnimal;
 
-    @Column(name = "nombre_materia_prima", nullable = false, length = 200)
-    private String nombreMateriaPrima;
+    @Column(name = "descripcion_animal", nullable = false, length = 200)
+    private String descripcionAnimal;
 
-    @Column(name = "precio_por_kilo", nullable = false)
-    private Double precioPorKilo;
+    /** Categoría libre (ej. "Cerda gestante", "Lechón destete"). Heredado del esquema V001. */
+    @Column(name = "categoria_animal", length = 100)
+    private String categoriaAnimal;
+
+    /** Notas operativas del usuario (RF-ANI-001). Sin límite duro, hasta TEXT. */
+    @Column(name = "observaciones", columnDefinition = "TEXT")
+    private String observaciones;
 
     @Column(nullable = false)
-    private Boolean activa;
+    private Boolean activo;
 
     @Column(name = "fecha_creacion", nullable = false)
     private Instant fechaCreacion;

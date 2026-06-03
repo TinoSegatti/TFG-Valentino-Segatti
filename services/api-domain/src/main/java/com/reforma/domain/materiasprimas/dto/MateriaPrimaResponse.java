@@ -4,7 +4,7 @@ import com.reforma.domain.materiasprimas.entity.MateriaPrima;
 import java.time.Instant;
 
 public record MateriaPrimaResponse(
-        String id,
+        Long id,
         String idGranja,
         String codigoMateriaPrima,
         String nombreMateriaPrima,

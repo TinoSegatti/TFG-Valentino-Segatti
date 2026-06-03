@@ -1,6 +1,5 @@
 package com.reforma.domain.materiasprimas.service;
 
-import com.reforma.domain.common.util.IdGenerator;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.granjas.service.GranjaAccesoService;
@@ -36,6 +35,17 @@ public class MateriaPrimaService {
                 .toList();
     }
 
+    /**
+     * Alta de materia prima. Política de soft-delete + entidades versionadas (ADR 0005):
+     * <ul>
+     *   <li>Rechaza con 409 si ya existe otra MP <b>activa</b> con el mismo código en la granja.</li>
+     *   <li>Si solo existen MPs <b>inactivas</b> con ese código, las deja intactas (son
+     *       histórico congelado) y crea una <b>fila nueva</b> con {@code id} autoincremental distinto.</li>
+     *   <li>El {@code id} (Long) lo asigna la BD; el {@code codigoMateriaPrima} lo ingresa el usuario.</li>
+     * </ul>
+     * Esto preserva la integridad histórica: las compras / fabricaciones / series ML
+     * asociadas a la MP vieja siguen apuntando a ella con sus datos originales.
+     */
     @Transactional
     public MateriaPrimaResponse crear(
             String idUsuario, String idGranja, MateriaPrimaRequest request) {
@@ -43,15 +53,15 @@ public class MateriaPrimaService {
         validarLimitePlan(idUsuario, idGranja);
 
         String codigo = request.codigoMateriaPrima().trim();
-        if (materiaPrimaRepository.existsByGranjaIdAndCodigoMateriaPrimaIgnoreCase(idGranja, codigo)) {
+        if (materiaPrimaRepository
+                .existsByGranjaIdAndCodigoMateriaPrimaIgnoreCaseAndActivaTrue(idGranja, codigo)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Ya existe una materia prima con código " + codigo + " en esta granja");
+                    "Ya existe una materia prima activa con código " + codigo + " en esta granja");
         }
         Granja granja = granjaRepository.findById(idGranja).orElseThrow();
         Instant now = Instant.now();
         MateriaPrima mp = MateriaPrima.builder()
-                .id(IdGenerator.newId())
                 .granja(granja)
                 .codigoMateriaPrima(codigo)
                 .nombreMateriaPrima(request.nombreMateriaPrima().trim())
@@ -65,13 +75,15 @@ public class MateriaPrimaService {
 
     @Transactional
     public MateriaPrimaResponse actualizar(
-            String idUsuario, String idGranja, String idMateriaPrima, MateriaPrimaRequest request) {
+            String idUsuario, String idGranja, Long idMateriaPrima, MateriaPrimaRequest request) {
         granjaAccesoService.validarAcceso(idUsuario, idGranja);
         MateriaPrima mp = obtenerOFallar(idMateriaPrima, idGranja);
         String nuevoCodigo = request.codigoMateriaPrima().trim();
+        // Solo bloqueamos si el código nuevo colisiona con OTRA MP ACTIVA (ver ADR 0005).
         if (!mp.getCodigoMateriaPrima().equalsIgnoreCase(nuevoCodigo)
-                && materiaPrimaRepository.existsByGranjaIdAndCodigoMateriaPrimaIgnoreCase(
-                        idGranja, nuevoCodigo)) {
+                && materiaPrimaRepository
+                        .existsByGranjaIdAndCodigoMateriaPrimaIgnoreCaseAndActivaTrue(
+                                idGranja, nuevoCodigo)) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "Código duplicado en la granja: " + nuevoCodigo);
         }
@@ -85,14 +97,14 @@ public class MateriaPrimaService {
     }
 
     @Transactional
-    public void desactivar(String idUsuario, String idGranja, String idMateriaPrima) {
+    public void desactivar(String idUsuario, String idGranja, Long idMateriaPrima) {
         granjaAccesoService.validarAcceso(idUsuario, idGranja);
         MateriaPrima mp = obtenerOFallar(idMateriaPrima, idGranja);
         mp.setActiva(false);
         mp.setFechaUltimaActualizacion(Instant.now());
     }
 
-    private MateriaPrima obtenerOFallar(String idMateriaPrima, String idGranja) {
+    private MateriaPrima obtenerOFallar(Long idMateriaPrima, String idGranja) {
         return materiaPrimaRepository
                 .findByIdAndGranjaId(idMateriaPrima, idGranja)
                 .orElseThrow(() ->

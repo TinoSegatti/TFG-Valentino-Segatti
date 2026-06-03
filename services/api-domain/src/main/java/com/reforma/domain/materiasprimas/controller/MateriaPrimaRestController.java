@@ -41,7 +41,7 @@ public class MateriaPrimaRestController {
     @PutMapping("/{idMateriaPrima}")
     public MateriaPrimaResponse actualizar(
             @PathVariable String idGranja,
-            @PathVariable String idMateriaPrima,
+            @PathVariable Long idMateriaPrima,
             @Valid @RequestBody MateriaPrimaRequest request) {
         return materiaPrimaService.actualizar(
                 SecurityUtils.requireUserId(), idGranja, idMateriaPrima, request);
@@ -49,7 +49,7 @@ public class MateriaPrimaRestController {
 
     @DeleteMapping("/{idMateriaPrima}")
     public ResponseEntity<Void> desactivar(
-            @PathVariable String idGranja, @PathVariable String idMateriaPrima) {
+            @PathVariable String idGranja, @PathVariable Long idMateriaPrima) {
         materiaPrimaService.desactivar(SecurityUtils.requireUserId(), idGranja, idMateriaPrima);
         return ResponseEntity.noContent().build();
     }

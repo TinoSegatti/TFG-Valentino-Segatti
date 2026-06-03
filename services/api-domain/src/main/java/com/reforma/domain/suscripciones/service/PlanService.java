@@ -39,4 +39,32 @@ public class PlanService {
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
     }
+
+    /**
+     * Límite de proveedores activos por plan (Sprint 2 — RF-PROV-002).
+     * Los valores siguen la lógica de los demás recursos: DEMO restrictivo para forzar upgrade,
+     * STARTER suficiente para PYMEs, BUSINESS para operaciones medianas y ENTERPRISE sin tope.
+     */
+    public int limiteProveedores(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO -> 5;
+            case STARTER -> 15;
+            case BUSINESS -> 50;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
+
+    /**
+     * Límite de animales activos por plan (Sprint 2 — RF-ANI-002).
+     * Los animales suelen ser pocos por granja (categorías productivas), por lo que el
+     * tope DEMO es estricto y STARTER cubre la inmensa mayoría de PYMEs.
+     */
+    public int limiteAnimales(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO -> 5;
+            case STARTER -> 20;
+            case BUSINESS -> 100;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
 }

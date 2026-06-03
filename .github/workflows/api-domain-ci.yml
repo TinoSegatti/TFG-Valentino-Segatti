@@ -20,3 +20,4 @@ jobs:
           java-version: '21'
           cache: maven
       - run: mvn -B test package
+      - run: mvn -B test -Pit

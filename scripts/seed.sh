@@ -27,11 +27,18 @@ INSERT INTO t_granja (id, id_usuario, nombre_granja, descripcion, activa, fecha_
 VALUES ('g_demo', 'u_demo', 'Granja Demo', 'Granja para pruebas locales', true, NOW())
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO t_materia_prima (id, id_granja, codigo_materia_prima, nombre_materia_prima, precio_por_kilo, activa) VALUES
-('mp_maiz', 'g_demo', 'MAIZ', 'Maíz molido', 35.50, true),
-('mp_soja', 'g_demo', 'SOJA', 'Harina de soja', 52.30, true),
-('mp_vit', 'g_demo', 'VITA', 'Premezcla vitamínica', 280.00, true)
-ON CONFLICT (id) DO NOTHING;
+-- id BIGINT autoincremental (V005); el código lo define el usuario.
+INSERT INTO t_materia_prima (id_granja, codigo_materia_prima, nombre_materia_prima, precio_por_kilo, activa)
+SELECT 'g_demo', v.codigo, v.nombre, v.precio, true
+FROM (VALUES
+  ('MAIZ', 'Maíz molido', 35.50),
+  ('SOJA', 'Harina de soja', 52.30),
+  ('VITA', 'Premezcla vitamínica', 280.00)
+) AS v(codigo, nombre, precio)
+WHERE NOT EXISTS (
+  SELECT 1 FROM t_materia_prima m
+  WHERE m.id_granja = 'g_demo' AND m.codigo_materia_prima = v.codigo AND m.activa = true
+);
 SQL
 
 echo "Seed SQL aplicado (catálogos opcionales)."

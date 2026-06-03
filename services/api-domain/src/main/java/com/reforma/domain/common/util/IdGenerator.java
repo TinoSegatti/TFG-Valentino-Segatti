@@ -4,7 +4,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 
 /**
- * Generador de IDs tipo CUID simplificado (32 chars) hasta integrar librería dedicada.
+ * Generador de IDs tipo CUID simplificado (32 chars) para entidades que aún usan VARCHAR(32)
+ * (Usuario, Granja). Los catálogos (materia prima, proveedor, animal) usan {@code Long}
+ * con {@code GenerationType.IDENTITY} — ver ADR 0006.
  */
 public final class IdGenerator {
 
