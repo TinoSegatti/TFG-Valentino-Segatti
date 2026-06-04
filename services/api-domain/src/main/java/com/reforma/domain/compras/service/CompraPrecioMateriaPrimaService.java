@@ -6,6 +6,7 @@ import com.reforma.domain.compras.entity.CompraCabecera;
 import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.compras.support.CompraCalculo;
+import com.reforma.domain.formulas.service.FormulaCostoSyncService;
 import com.reforma.domain.materiasprimas.entity.RegistroPrecio;
 import com.reforma.domain.materiasprimas.repository.MateriaPrimaRepository;
 import com.reforma.domain.materiasprimas.repository.RegistroPrecioRepository;
@@ -36,6 +37,7 @@ public class CompraPrecioMateriaPrimaService {
     private final CompraDetalleRepository compraDetalleRepository;
     private final MateriaPrimaRepository materiaPrimaRepository;
     private final RegistroPrecioRepository registroPrecioRepository;
+    private final FormulaCostoSyncService formulaCostoSyncService;
 
     @Transactional
     public void aplicarTrasGuardarDetalle(CompraCabecera cabecera, List<CompraDetalle> lineas) {
@@ -78,6 +80,7 @@ public class CompraPrecioMateriaPrimaService {
         for (Long idMateria : idsMaterias) {
             sincronizarPrecioCatalogo(idGranja, idMateria);
         }
+        formulaCostoSyncService.recalcularPorMateriasPrimas(idGranja, idsMaterias);
     }
 
     private void sincronizarPrecioCatalogo(String idGranja, Long idMateriaPrima) {

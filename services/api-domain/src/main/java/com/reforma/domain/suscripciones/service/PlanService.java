@@ -67,4 +67,14 @@ public class PlanService {
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
     }
+
+    /** RF-FORM-005: limite de formulas activas por plan. */
+    public int limiteFormulas(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO -> 3;
+            case STARTER -> 10;
+            case BUSINESS -> 50;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
 }

@@ -10,6 +10,7 @@ import com.reforma.domain.compras.domain.EstadoCompra;
 import com.reforma.domain.compras.entity.CompraCabecera;
 import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
+import com.reforma.domain.formulas.service.FormulaCostoSyncService;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.materiasprimas.entity.MateriaPrima;
 import com.reforma.domain.materiasprimas.repository.MateriaPrimaRepository;
@@ -35,6 +36,7 @@ class CompraPrecioMateriaPrimaServiceTest {
     @Mock private CompraDetalleRepository compraDetalleRepository;
     @Mock private MateriaPrimaRepository materiaPrimaRepository;
     @Mock private RegistroPrecioRepository registroPrecioRepository;
+    @Mock private FormulaCostoSyncService formulaCostoSyncService;
 
     @InjectMocks private CompraPrecioMateriaPrimaService service;
 
@@ -83,6 +85,7 @@ class CompraPrecioMateriaPrimaServiceTest {
         assertThat(captor.getValue().getFechaReferencia()).isEqualTo(compra.getFechaCompra());
         assertThat(captor.getValue().getOrigen()).isEqualTo(CompraPrecioMateriaPrimaService.ORIGEN_COMPRA);
         assertThat(maiz.getPrecioPorKilo()).isEqualTo(120.0);
+        verify(formulaCostoSyncService).recalcularPorMateriasPrimas(ID_GRANJA, java.util.Set.of(10L));
     }
 
     @Test
