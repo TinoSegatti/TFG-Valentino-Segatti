@@ -54,6 +54,7 @@ class CompraServiceTest {
     @Mock private GranjaRepository granjaRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private GranjaAccesoService granjaAccesoService;
+    @Mock private CompraPrecioMateriaPrimaService compraPrecioMateriaPrimaService;
 
     @InjectMocks private CompraService compraService;
 

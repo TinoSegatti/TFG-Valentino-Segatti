@@ -10,6 +10,8 @@ import com.reforma.domain.compras.dto.GuardarCompraDetalleRequest;
 import com.reforma.domain.compras.repository.CompraCabeceraRepository;
 import com.reforma.domain.compras.service.CompraService;
 import com.reforma.domain.materiasprimas.dto.MateriaPrimaRequest;
+import com.reforma.domain.materiasprimas.repository.MateriaPrimaRepository;
+import com.reforma.domain.materiasprimas.repository.RegistroPrecioRepository;
 import com.reforma.domain.materiasprimas.service.MateriaPrimaService;
 import com.reforma.domain.proveedores.dto.ProveedorRequest;
 import com.reforma.domain.proveedores.service.ProveedorService;
@@ -56,6 +58,8 @@ class ComprasIntegracionIT {
     @Autowired private CompraService compraService;
     @Autowired private ProveedorService proveedorService;
     @Autowired private MateriaPrimaService materiaPrimaService;
+    @Autowired private MateriaPrimaRepository materiaPrimaRepository;
+    @Autowired private RegistroPrecioRepository registroPrecioRepository;
     @Autowired private CompraCabeceraRepository compraCabeceraRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -67,6 +71,8 @@ class ComprasIntegracionIT {
     void seed() {
         jdbcTemplate.execute("DELETE FROM t_compra_detalle WHERE id_compra IN "
                 + "(SELECT id FROM t_compra_cabecera WHERE id_granja = '" + ID_GRANJA + "')");
+        jdbcTemplate.execute("DELETE FROM t_registro_precio WHERE id_materia_prima IN "
+                + "(SELECT id FROM t_materia_prima WHERE id_granja = '" + ID_GRANJA + "')");
         jdbcTemplate.execute("DELETE FROM t_compra_cabecera WHERE id_granja = '" + ID_GRANJA + "'");
         jdbcTemplate.execute("DELETE FROM t_materia_prima WHERE id_granja = '" + ID_GRANJA + "'");
         jdbcTemplate.execute("DELETE FROM t_proveedor WHERE id_granja = '" + ID_GRANJA + "'");
@@ -207,5 +213,92 @@ class ComprasIntegracionIT {
 
         assertThat(response.estado()).isEqualTo(EstadoCompra.REGISTRADA);
         assertThat(response.sumaSubtotales()).isEqualTo(999.6);
+    }
+
+    @Test
+    @DisplayName("guardarDetalle: actualiza precioPorKilo del catálogo y persiste t_registro_precio")
+    void guardarDetalle_sincronizaPrecioCatalogoEHistorial() {
+        var cabecera = compraService.crearCabecera(
+                ID_USUARIO,
+                ID_GRANJA,
+                new CompraCabeceraRequest(
+                        idProveedor,
+                        "F-PRECIO",
+                        LocalDate.of(2026, 6, 1),
+                        1_000.0,
+                        null));
+
+        compraService.guardarDetalle(
+                ID_USUARIO,
+                ID_GRANJA,
+                cabecera.id(),
+                new GuardarCompraDetalleRequest(
+                        List.of(new CompraDetalleLineRequest(idMpMaiz, 10.0, 120.0, 1_000.0))));
+
+        var maiz = materiaPrimaRepository.findById(idMpMaiz).orElseThrow();
+        assertThat(maiz.getPrecioPorKilo()).isEqualTo(120.0);
+
+        var historial = registroPrecioRepository.findByMateriaPrimaIdOrderByFechaReferenciaDescIdDesc(idMpMaiz);
+        assertThat(historial).hasSize(1);
+        assertThat(historial.get(0).getPrecioNuevo()).isEqualTo(120.0);
+        assertThat(historial.get(0).getOrigen()).isEqualTo("COMPRA");
+        assertThat(historial.get(0).getCompra()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("guardarDetalle: factura antigua no modifica catálogo si hay compra más reciente")
+    void guardarDetalle_facturaAntiguaNoPisaPrecioVigente() {
+        registrarCompra(
+                "F-RECIENTE",
+                LocalDate.of(2026, 6, 10),
+                idMpMaiz,
+                10.0,
+                200.0,
+                2_000.0);
+
+        var maizTrasReciente = materiaPrimaRepository.findById(idMpMaiz).orElseThrow();
+        assertThat(maizTrasReciente.getPrecioPorKilo()).isEqualTo(200.0);
+
+        var cabeceraAntigua = compraService.crearCabecera(
+                ID_USUARIO,
+                ID_GRANJA,
+                new CompraCabeceraRequest(
+                        idProveedor,
+                        "F-ANTIGUA",
+                        LocalDate.of(2026, 6, 1),
+                        500.0,
+                        null));
+
+        compraService.guardarDetalle(
+                ID_USUARIO,
+                ID_GRANJA,
+                cabeceraAntigua.id(),
+                new GuardarCompraDetalleRequest(
+                        List.of(new CompraDetalleLineRequest(idMpMaiz, 5.0, 50.0, 500.0))));
+
+        var maizFinal = materiaPrimaRepository.findById(idMpMaiz).orElseThrow();
+        assertThat(maizFinal.getPrecioPorKilo()).isEqualTo(200.0);
+
+        var historial = registroPrecioRepository.findByMateriaPrimaIdOrderByFechaReferenciaDescIdDesc(idMpMaiz);
+        assertThat(historial).hasSize(2);
+    }
+
+    private void registrarCompra(
+            String numeroFactura,
+            LocalDate fecha,
+            Long idMp,
+            double cantidad,
+            double precio,
+            double subtotal) {
+        var cabecera = compraService.crearCabecera(
+                ID_USUARIO,
+                ID_GRANJA,
+                new CompraCabeceraRequest(idProveedor, numeroFactura, fecha, subtotal, null));
+        compraService.guardarDetalle(
+                ID_USUARIO,
+                ID_GRANJA,
+                cabecera.id(),
+                new GuardarCompraDetalleRequest(
+                        List.of(new CompraDetalleLineRequest(idMp, cantidad, precio, subtotal))));
     }
 }

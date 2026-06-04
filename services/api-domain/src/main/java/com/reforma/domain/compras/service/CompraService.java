@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,7 @@ public class CompraService {
     private final GranjaRepository granjaRepository;
     private final UsuarioRepository usuarioRepository;
     private final GranjaAccesoService granjaAccesoService;
+    private final CompraPrecioMateriaPrimaService compraPrecioMateriaPrimaService;
 
     @Transactional(readOnly = true)
     public List<CompraResumenResponse> listar(String idUsuario, String idGranja) {
@@ -122,18 +124,27 @@ public class CompraService {
             requiereAjusteDetalle = true;
         }
 
-        return CompraCompletaResponse.from(compraCabeceraRepository.save(cabecera), requiereAjusteDetalle);
+        CompraCabecera guardada = compraCabeceraRepository.save(cabecera);
+        if (!requiereAjusteDetalle && guardada.getEstado() == EstadoCompra.REGISTRADA) {
+            compraPrecioMateriaPrimaService.aplicarTrasActualizarCabecera(guardada);
+        }
+
+        return CompraCompletaResponse.from(guardada, requiereAjusteDetalle);
     }
 
     @Transactional
     public void eliminarCabecera(String idUsuario, String idGranja, String idCompra) {
         granjaAccesoService.validarAcceso(idUsuario, idGranja);
         CompraCabecera cabecera = obtenerCabecera(idGranja, idCompra);
+        var idsMaterias = cabecera.getDetalles().stream()
+                .map(linea -> linea.getMateriaPrima().getId())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         // TODO(RF-INV): revertir impacto en inventario cuando exista el módulo.
         cabecera.getDetalles().clear();
         cabecera.setActivo(false);
         cabecera.setFechaEliminacion(Instant.now());
         cabecera.setEliminadoPor(idUsuario);
+        compraPrecioMateriaPrimaService.aplicarTrasEliminarCompra(idGranja, idCompra, idsMaterias);
     }
 
     @Transactional
@@ -160,6 +171,8 @@ public class CompraService {
         cabecera.getDetalles().clear();
         cabecera.getDetalles().addAll(nuevasLineas);
         cabecera.setEstado(EstadoCompra.REGISTRADA);
+
+        compraPrecioMateriaPrimaService.aplicarTrasGuardarDetalle(cabecera, nuevasLineas);
 
         return CompraCompletaResponse.from(cabecera);
     }

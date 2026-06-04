@@ -17,6 +17,16 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-04 — Compras: sincronización precio x kilo + historial ML
+- **Autor/agente:** Cursor Agent
+- **Qué:**
+  - Al guardar el detalle de una compra **REGISTRADA**, el catálogo `precio_por_kilo` de cada MP afectada se recalcula según la compra con `fecha_compra` más reciente (no pisa el vigente si se edita una factura antigua).
+  - Historial persistido en `t_registro_precio` (migración `V007`): `id_compra`, `fecha_referencia` (fecha de negocio), `origen=COMPRA` — base para series temporales de `api-ml`.
+  - Servicio `CompraPrecioMateriaPrimaService`; recálculo también al eliminar compra o actualizar cabecera REGISTRADA (p. ej. cambio de fecha).
+  - Tests: `CompraPrecioMateriaPrimaServiceTest` + escenarios en `ComprasIntegracionIT`.
+- **Archivos principales:** `V007__registro_precio_compras_ml.sql`, `RegistroPrecio.java`, `CompraPrecioMateriaPrimaService.java`, `CompraDetalleRepository.java`, `CompraService.java`.
+- **Pendiente:** consumir `t_registro_precio` desde `api-ml`; módulo inventario (TODO en `CompraService`).
+
 ### 2026-06-02 — Estabilización catálogos (MP, Proveedores, Animales)
 - **Autor/agente:** Cursor Agent
 - **Qué:**
