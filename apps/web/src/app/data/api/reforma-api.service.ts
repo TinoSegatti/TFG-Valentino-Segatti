@@ -13,6 +13,12 @@ import {
   CompraResumen,
   GuardarCompraDetalleRequest,
 } from '../models/compra.model';
+import {
+  FormulaCabeceraRequest,
+  FormulaCompleta,
+  FormulaResumen,
+  GuardarFormulaDetalleRequest,
+} from '../models/formula.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -156,5 +162,49 @@ export class ReformaApiService {
 
   eliminarCompra(idGranja: string, idCompra: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/compras/${idGranja}/${idCompra}`);
+  }
+
+  // === Formulas ===
+  getFormulas(idGranja: string): Observable<FormulaResumen[]> {
+    return this.http.get<FormulaResumen[]>(`${this.base}/api/formulas/${idGranja}`);
+  }
+
+  getFormula(idGranja: string, idFormula: string): Observable<FormulaCompleta> {
+    return this.http.get<FormulaCompleta>(
+      `${this.base}/api/formulas/${idGranja}/${idFormula}`,
+    );
+  }
+
+  crearFormulaCabecera(
+    idGranja: string,
+    request: FormulaCabeceraRequest,
+  ): Observable<FormulaCompleta> {
+    return this.http.post<FormulaCompleta>(`${this.base}/api/formulas/${idGranja}`, request);
+  }
+
+  actualizarFormulaCabecera(
+    idGranja: string,
+    idFormula: string,
+    request: FormulaCabeceraRequest,
+  ): Observable<FormulaCompleta> {
+    return this.http.put<FormulaCompleta>(
+      `${this.base}/api/formulas/${idGranja}/${idFormula}`,
+      request,
+    );
+  }
+
+  guardarFormulaDetalle(
+    idGranja: string,
+    idFormula: string,
+    request: GuardarFormulaDetalleRequest,
+  ): Observable<FormulaCompleta> {
+    return this.http.put<FormulaCompleta>(
+      `${this.base}/api/formulas/${idGranja}/${idFormula}/detalle`,
+      request,
+    );
+  }
+
+  desactivarFormula(idGranja: string, idFormula: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/formulas/${idGranja}/${idFormula}`);
   }
 }

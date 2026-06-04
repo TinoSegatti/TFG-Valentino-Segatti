@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { compraDetalleCanDeactivate } from './features/granja/compras/compra-detalle.guard';
+import { formulaDetalleCanDeactivate } from './features/granja/formulas/formula-detalle.guard';
 
 export const routes: Routes = [
   {
@@ -76,6 +77,35 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/granja/compras/compra-detalle.component').then(
             (m) => m.CompraDetalleComponent,
+          ),
+      },
+      {
+        path: 'formulas',
+        loadComponent: () =>
+          import('./features/granja/formulas/formulas.component').then(
+            (m) => m.FormulasComponent,
+          ),
+      },
+      {
+        path: 'formulas/nueva',
+        loadComponent: () =>
+          import('./features/granja/formulas/formula-nueva.component').then(
+            (m) => m.FormulaNuevaComponent,
+          ),
+      },
+      {
+        path: 'formulas/:idFormula/editar',
+        loadComponent: () =>
+          import('./features/granja/formulas/formula-editar.component').then(
+            (m) => m.FormulaEditarComponent,
+          ),
+      },
+      {
+        path: 'formulas/:idFormula',
+        canDeactivate: [formulaDetalleCanDeactivate],
+        loadComponent: () =>
+          import('./features/granja/formulas/formula-detalle.component').then(
+            (m) => m.FormulaDetalleComponent,
           ),
       },
     ],
