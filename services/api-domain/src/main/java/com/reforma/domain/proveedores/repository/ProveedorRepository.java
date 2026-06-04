@@ -25,5 +25,8 @@ public interface ProveedorRepository extends JpaRepository<Proveedor, Long> {
     boolean existsByGranjaIdAndCodigoProveedorIgnoreCaseAndActivoTrue(
             String idGranja, String codigo);
 
+    Optional<Proveedor> findByGranjaIdAndCodigoProveedorIgnoreCaseAndActivoTrue(
+            String idGranja, String codigo);
+
     long countByGranjaIdAndActivoTrue(String idGranja);
 }

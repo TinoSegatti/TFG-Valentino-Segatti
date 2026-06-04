@@ -1,6 +1,6 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
 
@@ -12,6 +12,9 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
     <main class="auth">
       <h1>REFORMA</h1>
       <p>Gestión integral de granjas</p>
+      @if (sessionExpired()) {
+        <p class="notice">Tu sesión expiró. Ingresá de nuevo.</p>
+      }
       <form (ngSubmit)="onSubmit()">
         <label>
           Email
@@ -53,6 +56,12 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
       .error {
         color: #b91c1c;
       }
+      .notice {
+        color: #92400e;
+        background: #fef3c7;
+        padding: 0.5rem 0.75rem;
+        border-radius: 4px;
+      }
       button {
         padding: 0.6rem;
         background: #166534;
@@ -63,15 +72,21 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
     `,
   ],
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly api = inject(ReformaApiService);
   private readonly auth = inject(AuthStateService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  email = '';
+  email = 'demo@reforma.local';
   password = '';
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly sessionExpired = signal(false);
+
+  ngOnInit(): void {
+    this.sessionExpired.set(this.route.snapshot.queryParamMap.get('sesion') === 'expirada');
+  }
 
   onSubmit(): void {
     this.loading.set(true);

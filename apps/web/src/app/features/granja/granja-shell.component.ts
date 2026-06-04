@@ -15,7 +15,8 @@ import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@ang
       <a routerLink="materias-primas" routerLinkActive="active">Materias primas</a>
       <a routerLink="proveedores" routerLinkActive="active">Proveedores</a>
       <a routerLink="animales" routerLinkActive="active">Animales</a>
-      <span class="todo">Compras · Inventario · Fórmulas (próximos sprints)</span>
+      <a routerLink="compras" routerLinkActive="active">Compras</a>
+      <span class="todo">Inventario · Fórmulas (próximos sprints)</span>
     </aside>
     <main class="content">
       <router-outlet />

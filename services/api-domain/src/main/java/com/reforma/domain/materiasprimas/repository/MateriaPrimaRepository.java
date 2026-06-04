@@ -18,5 +18,8 @@ public interface MateriaPrimaRepository extends JpaRepository<MateriaPrima, Long
     boolean existsByGranjaIdAndCodigoMateriaPrimaIgnoreCaseAndActivaTrue(
             String idGranja, String codigo);
 
+    Optional<MateriaPrima> findByGranjaIdAndCodigoMateriaPrimaIgnoreCaseAndActivaTrue(
+            String idGranja, String codigo);
+
     long countByGranjaIdAndActivaTrue(String idGranja);
 }

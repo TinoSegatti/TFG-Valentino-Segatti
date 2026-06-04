@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { compraDetalleCanDeactivate } from './features/granja/compras/compra-detalle.guard';
 
 export const routes: Routes = [
   {
@@ -48,6 +49,33 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/granja/animales/animales.component').then(
             (m) => m.AnimalesComponent,
+          ),
+      },
+      {
+        path: 'compras',
+        loadComponent: () =>
+          import('./features/granja/compras/compras.component').then((m) => m.ComprasComponent),
+      },
+      {
+        path: 'compras/nueva',
+        loadComponent: () =>
+          import('./features/granja/compras/compra-nueva.component').then(
+            (m) => m.CompraNuevaComponent,
+          ),
+      },
+      {
+        path: 'compras/:idCompra/editar',
+        loadComponent: () =>
+          import('./features/granja/compras/compra-editar.component').then(
+            (m) => m.CompraEditarComponent,
+          ),
+      },
+      {
+        path: 'compras/:idCompra',
+        canDeactivate: [compraDetalleCanDeactivate],
+        loadComponent: () =>
+          import('./features/granja/compras/compra-detalle.component').then(
+            (m) => m.CompraDetalleComponent,
           ),
       },
     ],

@@ -1,4 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
+import { isJwtUsable } from './jwt.utils';
 
 const TOKEN_KEY = 'reforma_jwt';
 
@@ -8,7 +9,7 @@ export class AuthStateService {
     typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null,
   );
 
-  readonly isAuthenticated = computed(() => !!this.tokenSignal());
+  readonly isAuthenticated = computed(() => isJwtUsable(this.tokenSignal()));
 
   getToken(): string | null {
     return this.tokenSignal();
@@ -26,6 +27,6 @@ export class AuthStateService {
 
   getAuthorizationHeader(): string | null {
     const t = this.tokenSignal();
-    return t ? `Bearer ${t}` : null;
+    return isJwtUsable(t) ? `Bearer ${t}` : null;
   }
 }

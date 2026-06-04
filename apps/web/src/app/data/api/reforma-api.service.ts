@@ -7,6 +7,12 @@ import { Granja } from '../models/granja.model';
 import { MateriaPrima, MateriaPrimaRequest } from '../models/materia-prima.model';
 import { Proveedor, ProveedorRequest } from '../models/proveedor.model';
 import { Animal, AnimalRequest } from '../models/animal.model';
+import {
+  CompraCabeceraRequest,
+  CompraCompleta,
+  CompraResumen,
+  GuardarCompraDetalleRequest,
+} from '../models/compra.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -111,5 +117,44 @@ export class ReformaApiService {
 
   desactivarAnimal(idGranja: string, idAnimal: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/animales/${idGranja}/${idAnimal}`);
+  }
+
+  // === Compras ===
+  getCompras(idGranja: string): Observable<CompraResumen[]> {
+    return this.http.get<CompraResumen[]>(`${this.base}/api/compras/${idGranja}`);
+  }
+
+  getCompra(idGranja: string, idCompra: string): Observable<CompraCompleta> {
+    return this.http.get<CompraCompleta>(`${this.base}/api/compras/${idGranja}/${idCompra}`);
+  }
+
+  crearCompraCabecera(idGranja: string, request: CompraCabeceraRequest): Observable<CompraCompleta> {
+    return this.http.post<CompraCompleta>(`${this.base}/api/compras/${idGranja}`, request);
+  }
+
+  guardarCompraDetalle(
+    idGranja: string,
+    idCompra: string,
+    request: GuardarCompraDetalleRequest,
+  ): Observable<CompraCompleta> {
+    return this.http.put<CompraCompleta>(
+      `${this.base}/api/compras/${idGranja}/${idCompra}/detalle`,
+      request,
+    );
+  }
+
+  actualizarCompraCabecera(
+    idGranja: string,
+    idCompra: string,
+    request: CompraCabeceraRequest,
+  ): Observable<CompraCompleta> {
+    return this.http.put<CompraCompleta>(
+      `${this.base}/api/compras/${idGranja}/${idCompra}`,
+      request,
+    );
+  }
+
+  eliminarCompra(idGranja: string, idCompra: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/compras/${idGranja}/${idCompra}`);
   }
 }

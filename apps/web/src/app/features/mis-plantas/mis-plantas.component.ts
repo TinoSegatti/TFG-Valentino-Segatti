@@ -17,6 +17,7 @@ import { Granja } from '../../data/models/granja.model';
       <p>Cargando…</p>
     } @else if (error()) {
       <p class="error">{{ error() }}</p>
+      <p><a routerLink="/auth/login">Volver a ingresar</a></p>
     } @else {
       <ul>
         @for (g of granjas(); track g.id) {
@@ -62,8 +63,13 @@ export class MisPlantasComponent implements OnInit {
         this.granjas.set(list);
         this.loading.set(false);
       },
-      error: () => {
-        this.error.set('No se pudieron cargar las granjas');
+      error: (err) => {
+        const status = err?.status;
+        if (status === 401 || status === 403) {
+          this.error.set('Sesión expirada o inválida. Volvé a ingresar.');
+        } else {
+          this.error.set('No se pudieron cargar las granjas. Verificá que el backend esté en marcha.');
+        }
         this.loading.set(false);
       },
     });

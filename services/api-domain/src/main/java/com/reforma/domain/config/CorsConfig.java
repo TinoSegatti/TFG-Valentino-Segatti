@@ -13,10 +13,11 @@ public class CorsConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource(ReformaProperties properties) {
         var config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
+        // Patrones: ng serve puede usar 4201+ si 4200 está ocupado (p. ej. contenedor web).
+        config.setAllowedOriginPatterns(List.of(
                 properties.frontendUrl(),
-                "http://localhost:4200",
-                "http://127.0.0.1:4200"));
+                "http://localhost:*",
+                "http://127.0.0.1:*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
