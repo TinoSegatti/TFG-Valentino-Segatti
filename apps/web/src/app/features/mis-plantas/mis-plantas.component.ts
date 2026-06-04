@@ -65,8 +65,8 @@ export class MisPlantasComponent implements OnInit {
       },
       error: (err) => {
         const status = err?.status;
-        if (status === 401 || status === 403) {
-          this.error.set('Sesión expirada o inválida. Volvé a ingresar.');
+        if (status === 401) {
+          this.error.set('Sesion expirada o invalida. Volve a ingresar.');
         } else {
           this.error.set('No se pudieron cargar las granjas. Verificá que el backend esté en marcha.');
         }

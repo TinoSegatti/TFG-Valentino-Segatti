@@ -17,6 +17,17 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-04 — Modulo Formulas dietarias (RF-FORM)
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - CRUD formulas: cabecera (codigo, descripcion, animal con autocomplete) + detalle MP/cantidad kg.
+  - Regla 1000 kg obligatorios para guardar y salir del editor; aviso de kg faltantes.
+  - Costo de formula = suma de (cantidad x precio x kilo vigente del catalogo).
+  - Al cambiar precios por compras, `FormulaCostoSyncService` recalcula subtotales y costo total de formulas afectadas.
+  - Migracion V008 (unique parcial codigo formula). Plan-gating RF-FORM-005.
+  - Frontend: listado, nueva, editar cabecera, detalle ingredientes, guard CanDeactivate.
+- **Archivos principales:** `domain/formulas/*`, `FormulaCostoSyncService`, `V008`, `apps/web/.../formulas/*`.
+
 ### 2026-06-04 — Compras: sincronización precio x kilo + historial ML
 - **Autor/agente:** Cursor Agent
 - **Qué:**
