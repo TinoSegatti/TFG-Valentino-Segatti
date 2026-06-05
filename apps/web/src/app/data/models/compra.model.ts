@@ -110,6 +110,13 @@ export function recalcularLineaDetalle(linea: LineaDetalleUi): void {
       }
       break;
     default:
+      if (c != null && p != null) {
+        linea.subtotal = calcularSubtotalCompra(c, p);
+      } else if (c != null && s != null && c > 0) {
+        linea.precioPorKilo = calcularPrecioCompra(s, c);
+      } else if (p != null && s != null && p > 0) {
+        linea.cantidadKg = calcularCantidadCompra(s, p);
+      }
       break;
   }
   actualizarAdvertenciaLinea(linea);
@@ -123,8 +130,6 @@ function actualizarAdvertenciaLinea(linea: LineaDetalleUi): void {
   const esperado = calcularSubtotalCompra(linea.cantidadKg, linea.precioPorKilo);
   if (!dentroToleranciaCompra(esperado, linea.subtotal)) {
     linea.advertenciaLinea = `Cantidad × precio (${esperado}) difiere del subtotal (${linea.subtotal}) fuera de tolerancia`;
-  } else if (Math.abs(esperado - linea.subtotal) > 1e-9) {
-    linea.advertenciaLinea = `Posible error de redondeo (± $${COMPRA_TOLERANCIA} permitido)`;
   } else {
     linea.advertenciaLinea = null;
   }
@@ -160,6 +165,20 @@ export function lineaDesdeCompra(linea: CompraDetalleLine): LineaDetalleUi {
     advertenciaLinea: null,
     ultimoCampoEditado: null,
   };
+}
+
+export function fingerprintLineasGuardables(lineas: LineaDetalleUi[]): string {
+  return JSON.stringify(
+    lineas
+      .filter((l) => l.idMateriaPrima != null)
+      .map((l) => ({
+        idMateriaPrima: l.idMateriaPrima,
+        cantidadKg: l.cantidadKg != null ? redondearCompra(l.cantidadKg) : null,
+        precioPorKilo: l.precioPorKilo != null ? redondearCompra(l.precioPorKilo) : null,
+        subtotal: l.subtotal != null ? redondearCompra(l.subtotal) : null,
+      }))
+      .sort((a, b) => (a.idMateriaPrima ?? 0) - (b.idMateriaPrima ?? 0)),
+  );
 }
 
 export function hoyIso(): string {

@@ -19,6 +19,12 @@ import {
   FormulaResumen,
   GuardarFormulaDetalleRequest,
 } from '../models/formula.model';
+import {
+  ActualizarCantidadRealRequest,
+  InicializarInventarioRequest,
+  InventarioItem,
+  InventarioListadoResponse,
+} from '../models/inventario.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -206,5 +212,42 @@ export class ReformaApiService {
 
   desactivarFormula(idGranja: string, idFormula: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/formulas/${idGranja}/${idFormula}`);
+  }
+
+  // === Inventario ===
+  getInventario(idGranja: string): Observable<InventarioListadoResponse> {
+    return this.http.get<InventarioListadoResponse>(`${this.base}/api/inventario/${idGranja}`);
+  }
+
+  inicializarInventario(
+    idGranja: string,
+    request: InicializarInventarioRequest,
+  ): Observable<InventarioItem[]> {
+    return this.http.post<InventarioItem[]>(
+      `${this.base}/api/inventario/${idGranja}/inicializar`,
+      request,
+    );
+  }
+
+  actualizarCantidadRealInventario(
+    idGranja: string,
+    idMateriaPrima: number,
+    request: ActualizarCantidadRealRequest,
+  ): Observable<InventarioItem> {
+    return this.http.put<InventarioItem>(
+      `${this.base}/api/inventario/${idGranja}/materia-prima/${idMateriaPrima}/cantidad-real`,
+      request,
+    );
+  }
+
+  recalcularInventario(idGranja: string): Observable<InventarioListadoResponse> {
+    return this.http.post<InventarioListadoResponse>(
+      `${this.base}/api/inventario/${idGranja}/recalcular`,
+      {},
+    );
+  }
+
+  vaciarInventario(idGranja: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/api/inventario/${idGranja}`);
   }
 }

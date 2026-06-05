@@ -7,6 +7,7 @@ import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.compras.support.CompraCalculo;
 import com.reforma.domain.formulas.service.FormulaCostoSyncService;
+import com.reforma.domain.inventario.service.InventarioRecalculoService;
 import com.reforma.domain.materiasprimas.entity.RegistroPrecio;
 import com.reforma.domain.materiasprimas.repository.MateriaPrimaRepository;
 import com.reforma.domain.materiasprimas.repository.RegistroPrecioRepository;
@@ -38,9 +39,11 @@ public class CompraPrecioMateriaPrimaService {
     private final MateriaPrimaRepository materiaPrimaRepository;
     private final RegistroPrecioRepository registroPrecioRepository;
     private final FormulaCostoSyncService formulaCostoSyncService;
+    private final InventarioRecalculoService inventarioRecalculoService;
 
     @Transactional
-    public void aplicarTrasGuardarDetalle(CompraCabecera cabecera, List<CompraDetalle> lineas) {
+    public void aplicarTrasGuardarDetalle(
+            CompraCabecera cabecera, List<CompraDetalle> lineas, Collection<Long> idsMateriasARecalcular) {
         if (lineas.isEmpty()) {
             return;
         }
@@ -49,7 +52,7 @@ public class CompraPrecioMateriaPrimaService {
         for (CompraDetalle linea : lineas) {
             registrarObservacionCompra(cabecera, linea, ahora);
         }
-        recalcularCatalogo(cabecera.getGranja().getId(), idsMaterias(lineas));
+        recalcularCatalogo(cabecera.getGranja().getId(), idsMateriasARecalcular);
     }
 
     @Transactional
@@ -81,6 +84,7 @@ public class CompraPrecioMateriaPrimaService {
             sincronizarPrecioCatalogo(idGranja, idMateria);
         }
         formulaCostoSyncService.recalcularPorMateriasPrimas(idGranja, idsMaterias);
+        inventarioRecalculoService.recalcularPorMaterias(idGranja, idsMaterias);
     }
 
     private void sincronizarPrecioCatalogo(String idGranja, Long idMateriaPrima) {

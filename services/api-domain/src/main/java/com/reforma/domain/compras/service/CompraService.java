@@ -139,11 +139,11 @@ public class CompraService {
         var idsMaterias = cabecera.getDetalles().stream()
                 .map(linea -> linea.getMateriaPrima().getId())
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        // TODO(RF-INV): revertir impacto en inventario cuando exista el módulo.
         cabecera.getDetalles().clear();
         cabecera.setActivo(false);
         cabecera.setFechaEliminacion(Instant.now());
         cabecera.setEliminadoPor(idUsuario);
+        compraCabeceraRepository.saveAndFlush(cabecera);
         compraPrecioMateriaPrimaService.aplicarTrasEliminarCompra(idGranja, idCompra, idsMaterias);
     }
 
@@ -167,12 +167,19 @@ public class CompraService {
                             + ")");
         }
 
-        // TODO(RF-INV): aplicar delta de inventario según líneas anteriores vs nuevas.
+        var idsMaterias = cabecera.getDetalles().stream()
+                .map(linea -> linea.getMateriaPrima().getId())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        for (CompraDetalle linea : nuevasLineas) {
+            idsMaterias.add(linea.getMateriaPrima().getId());
+        }
+
         cabecera.getDetalles().clear();
         cabecera.getDetalles().addAll(nuevasLineas);
         cabecera.setEstado(EstadoCompra.REGISTRADA);
+        compraCabeceraRepository.saveAndFlush(cabecera);
 
-        compraPrecioMateriaPrimaService.aplicarTrasGuardarDetalle(cabecera, nuevasLineas);
+        compraPrecioMateriaPrimaService.aplicarTrasGuardarDetalle(cabecera, nuevasLineas, idsMaterias);
 
         return CompraCompletaResponse.from(cabecera);
     }

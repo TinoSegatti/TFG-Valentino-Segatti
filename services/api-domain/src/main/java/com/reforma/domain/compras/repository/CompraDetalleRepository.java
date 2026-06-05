@@ -2,6 +2,7 @@ package com.reforma.domain.compras.repository;
 
 import com.reforma.domain.compras.domain.EstadoCompra;
 import com.reforma.domain.compras.entity.CompraDetalle;
+import com.reforma.domain.compras.support.CompraTotalesMateriaPrima;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,4 +30,40 @@ public interface CompraDetalleRepository extends JpaRepository<CompraDetalle, St
             @Param("idMateriaPrima") Long idMateriaPrima,
             @Param("estado") EstadoCompra estado,
             Pageable pageable);
+
+    /**
+     * Totales por materia prima en compras REGISTRADAS y activas de la granja.
+     * Devuelve {@code [idMateriaPrima, totalKilos, totalDinero]} ordenado por MP.
+     */
+    @Query(
+            """
+            SELECT cd.materiaPrima.id, SUM(cd.cantidadComprada), SUM(cd.cantidadComprada * cd.precioUnitario)
+            FROM CompraDetalle cd
+            JOIN cd.compra c
+            WHERE c.granja.id = :idGranja
+              AND c.activo = true
+              AND c.estado = :estado
+            GROUP BY cd.materiaPrima.id
+            """)
+    List<Object[]> sumarTotalesPorMateriaPrima(
+            @Param("idGranja") String idGranja, @Param("estado") EstadoCompra estado);
+
+    /** Total {kilos, dinero} de compras REGISTRADAS para una MP. */
+    @Query(
+            """
+            SELECT new com.reforma.domain.compras.support.CompraTotalesMateriaPrima(
+                COALESCE(SUM(cd.cantidadComprada), 0.0),
+                COALESCE(SUM(cd.cantidadComprada * cd.precioUnitario), 0.0)
+            )
+            FROM CompraDetalle cd
+            JOIN cd.compra c
+            WHERE c.granja.id = :idGranja
+              AND c.activo = true
+              AND c.estado = :estado
+              AND cd.materiaPrima.id = :idMateriaPrima
+            """)
+    CompraTotalesMateriaPrima totalPorMateriaPrima(
+            @Param("idGranja") String idGranja,
+            @Param("idMateriaPrima") Long idMateriaPrima,
+            @Param("estado") EstadoCompra estado);
 }

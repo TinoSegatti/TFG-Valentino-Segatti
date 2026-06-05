@@ -3,12 +3,13 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { MateriaPrima } from '../../../data/models/materia-prima.model';
 import {
-  calcularSubtotalCompra,
   CompraCompleta,
   dentroToleranciaCompra,
+  fingerprintLineasGuardables,
   lineaDesdeCompra,
   lineaDetalleVacia,
   LineaDetalleUi,
@@ -73,16 +74,17 @@ import {
         <section class="detalle-editable">
           <h3>Ítems de la factura</h3>
           <p class="hint-nota">
-            Los cambios en cantidades o precios impactarán el inventario cuando ese módulo esté activo.
+            Los cambios en cantidades o precios impactan el inventario y los precios vigentes del catalogo.
           </p>
 
-          @for (linea of lineas(); track $index; let i = $index) {
+          @for (linea of lineas(); track i; let i = $index) {
             <div class="linea">
               <div class="mp-autocomplete">
                 <label>
                   Código MP
                   <input
                     [(ngModel)]="linea.codigo"
+                    [ngModelOptions]="{ standalone: true }"
                     (ngModelChange)="onCodigoMpChange(i, $event)"
                     autocomplete="off"
                   />
@@ -91,6 +93,7 @@ import {
                   Materia prima
                   <input
                     [(ngModel)]="linea.nombre"
+                    [ngModelOptions]="{ standalone: true }"
                     (ngModelChange)="onNombreMpChange(i, $event)"
                     (focus)="abrirMp(i)"
                     (blur)="cerrarMp(i)"
@@ -112,8 +115,9 @@ import {
                 <input
                   type="number"
                   step="0.001"
-                  [(ngModel)]="linea.cantidadKg"
-                  (ngModelChange)="onCampoNumerico(i, 'cantidad', $event)"
+                  [value]="valorInput(linea.cantidadKg)"
+                  (input)="onCampoInput($event, i, 'cantidad')"
+                  (blur)="onCampoBlur(i, 'cantidad')"
                 />
               </label>
               <label>
@@ -121,8 +125,9 @@ import {
                 <input
                   type="number"
                   step="0.001"
-                  [(ngModel)]="linea.precioPorKilo"
-                  (ngModelChange)="onCampoNumerico(i, 'precio', $event)"
+                  [value]="valorInput(linea.precioPorKilo)"
+                  (input)="onCampoInput($event, i, 'precio')"
+                  (blur)="onCampoBlur(i, 'precio')"
                 />
               </label>
               <label>
@@ -130,8 +135,9 @@ import {
                 <input
                   type="number"
                   step="0.001"
-                  [(ngModel)]="linea.subtotal"
-                  (ngModelChange)="onCampoNumerico(i, 'subtotal', $event)"
+                  [value]="valorInput(linea.subtotal)"
+                  (input)="onCampoInput($event, i, 'subtotal')"
+                  (blur)="onCampoBlur(i, 'subtotal')"
                 />
               </label>
               <button type="button" class="danger" (click)="quitarLinea(i)">Quitar</button>
@@ -318,13 +324,12 @@ export class CompraDetalleComponent implements OnInit {
   readonly guardando = signal(false);
   readonly error = signal<string | null>(null);
   readonly mpAbiertoIndex = signal<number | null>(null);
-  /** true si el usuario editó algo desde la última carga o guardado exitoso */
-  readonly hayCambiosSinGuardar = signal(false);
   readonly facturaEliminada = signal(false);
   readonly fraseEliminarEsperada = signal('');
 
   textoConfirmacionEliminar = '';
 
+  private lineasSnapshot = '';
   private sincronizandoMp = false;
 
   readonly sinLineas = computed(() => this.lineas().length === 0);
@@ -335,7 +340,7 @@ export class CompraDetalleComponent implements OnInit {
 
   readonly sumaSubtotales = computed(() =>
     redondearCompra(
-      this.lineasConMateria().reduce((acc, l) => acc + (l.subtotal ?? 0), 0),
+      this.lineas().reduce((acc, l) => acc + (l.subtotal ?? 0), 0),
     ),
   );
 
@@ -388,13 +393,17 @@ export class CompraDetalleComponent implements OnInit {
         this.compra.set(c);
         this.fraseEliminarEsperada.set(textoConfirmacionEliminarFactura(c.numeroFactura));
         if (c.lineas.length > 0) {
-          this.lineas.set(c.lineas.map(lineaDesdeCompra));
+          const lineas = c.lineas.map(lineaDesdeCompra);
+          for (const linea of lineas) {
+            recalcularLineaDetalle(linea);
+          }
+          this.lineas.set(lineas);
         } else if (c.estado === 'BORRADOR') {
           this.lineas.set([lineaDetalleVacia()]);
         } else {
           this.lineas.set([]);
         }
-        this.hayCambiosSinGuardar.set(false);
+        this.establecerSnapshotLineas();
         this.cargando.set(false);
       },
       error: () => {
@@ -428,8 +437,7 @@ export class CompraDetalleComponent implements OnInit {
 
   onCodigoMpChange(index: number, codigo: string): void {
     if (this.sincronizandoMp) return;
-    this.marcarModificado();
-    const lineas = [...this.lineas()];
+    const lineas = this.lineas().map((l) => ({ ...l }));
     const mp = this.materiasPrimas().find(
       (m) => m.codigoMateriaPrima.toLowerCase() === codigo.trim().toLowerCase(),
     );
@@ -443,12 +451,11 @@ export class CompraDetalleComponent implements OnInit {
 
   onNombreMpChange(index: number, nombre: string): void {
     if (this.sincronizandoMp) return;
-    this.marcarModificado();
     this.mpAbiertoIndex.set(index);
     const exacto = this.materiasPrimas().find(
       (m) => m.nombreMateriaPrima.toLowerCase() === nombre.trim().toLowerCase(),
     );
-    const lineas = [...this.lineas()];
+    const lineas = this.lineas().map((l) => ({ ...l }));
     if (exacto) {
       this.aplicarMp(lineas, index, exacto);
     } else {
@@ -458,42 +465,66 @@ export class CompraDetalleComponent implements OnInit {
   }
 
   seleccionarMp(index: number, mp: MateriaPrima): void {
-    this.marcarModificado();
-    const lineas = [...this.lineas()];
+    const lineas = this.lineas().map((l) => ({ ...l }));
     this.aplicarMp(lineas, index, mp);
     this.lineas.set(lineas);
     this.mpAbiertoIndex.set(null);
   }
 
-  onCampoNumerico(
+  onCampoInput(
+    event: Event,
+    index: number,
+    campo: 'cantidad' | 'precio' | 'subtotal',
+  ): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const valor = raw.trim() === '' ? null : Number(raw);
+    this.actualizarCampoLinea(index, campo, valor);
+  }
+
+  onCampoBlur(index: number, campo: 'cantidad' | 'precio' | 'subtotal'): void {
+    const linea = this.lineas()[index];
+    if (!linea) return;
+    this.actualizarCampoLinea(index, campo, linea[this.campoLineaKey(campo)]);
+  }
+
+  valorInput(valor: number | null): string | number {
+    return valor ?? '';
+  }
+
+  private campoLineaKey(campo: 'cantidad' | 'precio' | 'subtotal') {
+    return campo === 'cantidad'
+      ? 'cantidadKg'
+      : campo === 'precio'
+        ? 'precioPorKilo'
+        : 'subtotal';
+  }
+
+  private actualizarCampoLinea(
     index: number,
     campo: 'cantidad' | 'precio' | 'subtotal',
     valor: number | null,
   ): void {
-    this.marcarModificado();
-    const lineas = [...this.lineas()];
+    const lineas = this.lineas().map((l) => ({ ...l }));
     const linea = lineas[index];
+    if (!linea) return;
+    const campoLinea = this.campoLineaKey(campo);
+
     if (valor == null || Number.isNaN(valor)) {
-      linea[campo === 'cantidad' ? 'cantidadKg' : campo === 'precio' ? 'precioPorKilo' : 'subtotal'] =
-        null;
+      linea[campoLinea] = null;
     } else {
-      const red = redondearCompra(valor);
-      if (campo === 'cantidad') linea.cantidadKg = red;
-      if (campo === 'precio') linea.precioPorKilo = red;
-      if (campo === 'subtotal') linea.subtotal = red;
+      linea[campoLinea] = redondearCompra(valor);
     }
+
     linea.ultimoCampoEditado = campo;
     recalcularLineaDetalle(linea);
     this.lineas.set(lineas);
   }
 
   agregarLinea(): void {
-    this.marcarModificado();
     this.lineas.update((prev) => [...prev, lineaDetalleVacia()]);
   }
 
   quitarLinea(index: number): void {
-    this.marcarModificado();
     this.lineas.update((prev) => prev.filter((_, i) => i !== index));
   }
 
@@ -512,12 +543,12 @@ export class CompraDetalleComponent implements OnInit {
     this.api.guardarCompraDetalle(this.idGranja, this.idCompra, body).subscribe({
       next: () => {
         this.guardando.set(false);
-        this.hayCambiosSinGuardar.set(false);
+        this.establecerSnapshotLineas();
         void this.router.navigate(['..'], { relativeTo: this.route });
       },
       error: (err: HttpErrorResponse) => {
         this.guardando.set(false);
-        this.error.set(err.error?.message ?? 'No se pudo guardar el detalle');
+        this.error.set(mensajeErrorHttp(err, 'No se pudo guardar el detalle'));
       },
     });
   }
@@ -537,7 +568,7 @@ export class CompraDetalleComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.guardando.set(false);
-        this.error.set(err.error?.message ?? 'No se pudo eliminar la factura');
+        this.error.set(mensajeErrorHttp(err, 'No se pudo eliminar la factura'));
       },
     });
   }
@@ -554,6 +585,10 @@ export class CompraDetalleComponent implements OnInit {
     return !this.hayCambiosSinGuardar();
   }
 
+  hayCambiosSinGuardar(): boolean {
+    return fingerprintLineasGuardables(this.lineas()) !== this.lineasSnapshot;
+  }
+
   mensajeBloqueoSalida(): string {
     if (this.sinLineas()) {
       return 'La factura no tiene ítems. Eliminá la cabecera o agregá al menos un ítem antes de salir.';
@@ -564,16 +599,19 @@ export class CompraDetalleComponent implements OnInit {
     if (!this.puedeGuardar()) {
       return 'Revisá las advertencias en las líneas (cantidad × precio vs subtotal) antes de guardar y salir.';
     }
-    return 'Tenés cambios sin guardar. Usá «Guardar factura completa» y luego podés volver al listado.';
+    if (this.hayCambiosSinGuardar()) {
+      return 'Tenés cambios sin guardar. Usá «Guardar factura completa» y luego podés volver al listado.';
+    }
+    return 'No podés salir todavía. Revisá la factura e intentá de nuevo.';
   }
 
-  private marcarModificado(): void {
-    this.hayCambiosSinGuardar.set(true);
+  private establecerSnapshotLineas(): void {
+    this.lineasSnapshot = fingerprintLineasGuardables(this.lineas());
   }
 
   private aplicarMp(lineas: LineaDetalleUi[], index: number, mp: MateriaPrima): void {
     this.sincronizandoMp = true;
-    const linea = lineas[index];
+    const linea = { ...lineas[index] };
     linea.idMateriaPrima = mp.id;
     linea.codigo = mp.codigoMateriaPrima;
     linea.nombre = mp.nombreMateriaPrima;
@@ -581,11 +619,9 @@ export class CompraDetalleComponent implements OnInit {
     if (linea.precioPorKilo == null) {
       linea.precioPorKilo = redondearCompra(mp.precioPorKilo);
       linea.ultimoCampoEditado = 'precio';
-      if (linea.cantidadKg != null) {
-        linea.subtotal = calcularSubtotalCompra(linea.cantidadKg, linea.precioPorKilo);
-      }
     }
     recalcularLineaDetalle(linea);
+    lineas[index] = linea;
     this.sincronizandoMp = false;
   }
 }

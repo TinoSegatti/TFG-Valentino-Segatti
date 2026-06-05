@@ -11,6 +11,7 @@ import com.reforma.domain.compras.entity.CompraCabecera;
 import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.formulas.service.FormulaCostoSyncService;
+import com.reforma.domain.inventario.service.InventarioRecalculoService;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.materiasprimas.entity.MateriaPrima;
 import com.reforma.domain.materiasprimas.repository.MateriaPrimaRepository;
@@ -37,6 +38,7 @@ class CompraPrecioMateriaPrimaServiceTest {
     @Mock private MateriaPrimaRepository materiaPrimaRepository;
     @Mock private RegistroPrecioRepository registroPrecioRepository;
     @Mock private FormulaCostoSyncService formulaCostoSyncService;
+    @Mock private InventarioRecalculoService inventarioRecalculoService;
 
     @InjectMocks private CompraPrecioMateriaPrimaService service;
 
@@ -76,7 +78,7 @@ class CompraPrecioMateriaPrimaServiceTest {
                         eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA), any(Pageable.class)))
                 .thenReturn(List.of(linea));
 
-        service.aplicarTrasGuardarDetalle(compra, List.of(linea));
+        service.aplicarTrasGuardarDetalle(compra, List.of(linea), java.util.Set.of(10L));
 
         verify(registroPrecioRepository).deleteByCompra_Id("c1");
         var captor = ArgumentCaptor.forClass(com.reforma.domain.materiasprimas.entity.RegistroPrecio.class);
@@ -86,6 +88,7 @@ class CompraPrecioMateriaPrimaServiceTest {
         assertThat(captor.getValue().getOrigen()).isEqualTo(CompraPrecioMateriaPrimaService.ORIGEN_COMPRA);
         assertThat(maiz.getPrecioPorKilo()).isEqualTo(120.0);
         verify(formulaCostoSyncService).recalcularPorMateriasPrimas(ID_GRANJA, java.util.Set.of(10L));
+        verify(inventarioRecalculoService).recalcularPorMaterias(ID_GRANJA, java.util.Set.of(10L));
     }
 
     @Test

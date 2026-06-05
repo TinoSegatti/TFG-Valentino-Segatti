@@ -50,4 +50,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(code)
                 .body(ApiError.of(code, reason, message, request.getRequestURI()));
     }
+
+    @ExceptionHandler({
+        org.springframework.orm.ObjectOptimisticLockingFailureException.class,
+        org.hibernate.StaleObjectStateException.class
+    })
+    public ResponseEntity<ApiError> handleOptimisticLock(Exception ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of(
+                        HttpStatus.CONFLICT.value(),
+                        "Conflict",
+                        "El registro fue modificado por otra operacion. Recargue e intente de nuevo.",
+                        request.getRequestURI()));
+    }
 }

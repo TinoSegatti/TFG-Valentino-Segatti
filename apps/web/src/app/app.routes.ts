@@ -108,6 +108,15 @@ export const routes: Routes = [
             (m) => m.FormulaDetalleComponent,
           ),
       },
+      {
+        path: 'inventario',
+        loadComponent: () =>
+          import('./features/granja/inventario/inventario.component').then(
+            (m) => m.InventarioComponent,
+          ),
+      },
+      { path: 'iventario', redirectTo: 'inventario', pathMatch: 'full' },
+      { path: '**', redirectTo: 'resumen' },
     ],
   },
   { path: '**', redirectTo: '' },

@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://localhost:8080',
+  /** Vacio = mismo origen; nginx en Docker proxy /api -> api-domain */
+  apiUrl: '',
 };

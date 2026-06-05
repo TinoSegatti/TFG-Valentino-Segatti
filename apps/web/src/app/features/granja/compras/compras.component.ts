@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { CompraResumen, textoConfirmacionEliminarFactura } from '../../../data/models/compra.model';
 
@@ -268,7 +269,7 @@ export class ComprasComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.guardando.set(false);
-        this.error.set(err.error?.message ?? 'No se pudo eliminar la factura');
+        this.error.set(mensajeErrorHttp(err, 'No se pudo eliminar la factura'));
       },
     });
   }

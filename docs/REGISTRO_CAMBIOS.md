@@ -17,6 +17,41 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-05 — Estabilizacion Compras e Inventario (fixes UI + backend)
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - **Compras — detalle factura:** calculo bidireccional cantidad x precio = subtotal en tiempo real (evento `input`, sin depender de `ngModel` roto). Suma de subtotales reactiva con un solo item; `puedeGuardar` cuando total cuadra y MP seleccionada. Snapshot `fingerprintLineasGuardables` para detectar cambios reales (no bloqueo falso al salir). Guard `CanDeactivate` + `mensajeErrorHttp()` en errores API.
+  - **Compras — backend:** `saveAndFlush(cabecera)` antes de hooks de precio/inventario en `guardarDetalle` y `eliminarCabecera` (evita recalcular con datos stale en BD). Record `CompraTotalesMateriaPrima` en query de totales (fix `ArrayIndexOutOfBoundsException`).
+  - **Inventario — backend:** `InventarioRecalculoService` sin `@Transactional(readOnly)` en calculos; upsert unificado con `save()`; handler HTTP 409 en optimistic locking (`GlobalExceptionHandler`).
+  - **Inventario — frontend:** merma = `cantidadSistema - cantidadReal` en tabla y resumen. Resumen toneladas: suma `cantidadReal > 0` / 1000, formato `es-AR` (evita confundir `10,000 t` con diez mil). Modales inicializar / editar cantidad real.
+  - **Infra web:** redirect `iventario` → `inventario`; `environment.prod.ts` `apiUrl: ''` (proxy nginx `/api`).
+- **Archivos principales:** `CompraService.java`, `compra-detalle.component.ts`, `compra.model.ts`, `compras.component.ts`, `InventarioRecalculoService.java`, `InventarioService.java`, `GlobalExceptionHandler.java`, `inventario.component.ts`, `api-error.util.ts`, `compra-detalle.component.spec.ts`.
+- **Pendiente:** commit + push al remoto; ejecutar `mvn test` y `mvn test -Pit` antes del merge.
+
+### 2026-06-04 — Modulo Compras end-to-end (RF-COMP)
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - CRUD compras: cabecera (proveedor, numero factura, fecha, total, observaciones) + detalle por lineas MP.
+  - Estados `BORRADOR` / `REGISTRADA`; tolerancia ± $0,50 en lineas y total factura vs suma subtotales.
+  - Snapshots inmutables en `t_compra_detalle` (codigo/nombre MP, precio anterior) — ADR 0005.
+  - Migracion `V006__compras_snapshots_estado.sql`.
+  - Frontend Angular: listado, nueva cabecera, editar cabecera, detalle editable con autocomplete MP, eliminar factura con frase de confirmacion, guard `compraDetalleCanDeactivate`.
+  - Modelos `compra.model.ts` (`recalcularLineaDetalle`, `fingerprintLineasGuardables`, helpers de redondeo).
+  - Tests: `CompraServiceTest`, `CompraRestControllerTest`, `CompraCalculoTest`, `ComprasIntegracionIT`.
+- **Archivos principales:** `domain/compras/*`, `apps/web/.../compras/*`, `V006`, `reforma-api.service.ts`, `app.routes.ts`.
+- **Pendiente:** ver entrada 2026-06-05 (fixes de calculo automatico y persistencia).
+
+### 2026-06-03 — Modulo Inventario (RF-INV)
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - Tabla de inventario con todas las MPs activas: codigo, precio vigente (sync compras), cantidad acumulada, cantidad en sistema, cantidad real editable, merma, valor de stock (real x precio vigente), precio almacen (promedio ponderado por kilos incluyendo inventario inicial).
+  - Recalculo automatico al registrar/eliminar/modificar compras via `CompraPrecioMateriaPrimaService` + `InventarioRecalculoService` (preserva ajuste manual real - sistema).
+  - Inicializar inventario (`t_inventario_inicial`), recalcular, vaciar, editar cantidad real por MP.
+  - Frontend Angular: listado, resumen, modales inicializacion y edicion cantidad real.
+  - Tests: `InventarioCalculoTest`, `InventarioRecalculoServiceTest`, `InventarioIntegracionIT`.
+- **Archivos principales:** `domain/inventario/*`, `CompraPrecioMateriaPrimaService`, `CompraDetalleRepository.totalPorMateriaPrima`, `apps/web/.../inventario/*`.
+- **Pendiente:** restar fabricaciones en cantidad en sistema (TODO RF-FAB); grafico de existencias opcional.
+
 ### 2026-06-04 — Modulo Formulas dietarias (RF-FORM)
 - **Autor/agente:** Cursor Agent
 - **Que:**
@@ -36,7 +71,7 @@ Formato sugerido por entrada:
   - Servicio `CompraPrecioMateriaPrimaService`; recálculo también al eliminar compra o actualizar cabecera REGISTRADA (p. ej. cambio de fecha).
   - Tests: `CompraPrecioMateriaPrimaServiceTest` + escenarios en `ComprasIntegracionIT`.
 - **Archivos principales:** `V007__registro_precio_compras_ml.sql`, `RegistroPrecio.java`, `CompraPrecioMateriaPrimaService.java`, `CompraDetalleRepository.java`, `CompraService.java`.
-- **Pendiente:** consumir `t_registro_precio` desde `api-ml`; módulo inventario (TODO en `CompraService`).
+- **Pendiente:** consumir `t_registro_precio` desde `api-ml`; restar fabricaciones en inventario (RF-FAB).
 
 ### 2026-06-02 — Estabilización catálogos (MP, Proveedores, Animales)
 - **Autor/agente:** Cursor Agent
