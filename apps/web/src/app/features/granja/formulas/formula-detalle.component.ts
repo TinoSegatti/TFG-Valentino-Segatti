@@ -1,10 +1,11 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
+import { Animal } from '../../../data/models/animal.model';
 import { MateriaPrima } from '../../../data/models/materia-prima.model';
 import {
   FormulaCompleta,
@@ -17,6 +18,7 @@ import {
   redondearFormula,
   sumaKgCompleta,
 } from '../../../data/models/formula.model';
+import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
 
 @Component({
   selector: 'app-formula-detalle',
@@ -26,35 +28,185 @@ import {
     @if (cargando()) {
       <p>Cargando formula…</p>
     } @else if (formula()) {
-      <header class="cabecera-readonly">
+      <header class="pagina-cabecera">
         <a routerLink="../" class="back" (click)="intentarVolver($event)">← Volver al listado</a>
-        <h2>
-          {{ soloLectura() ? 'Ver' : 'Editar' }} formula {{ formula()!.codigoFormula }}
-        </h2>
-        <dl>
-          <div><dt>Descripcion</dt><dd>{{ formula()!.descripcionFormula }}</dd></div>
-          <div><dt>Animal</dt><dd>{{ formula()!.descripcionAnimal }} ({{ formula()!.codigoAnimal }})</dd></div>
-          <div>
-            <dt>Costo de fabricacion</dt>
-            <dd>$ {{ costoTotalUi() | number: '1.3-3' }}</dd>
-          </div>
-        </dl>
-        @if (!soloLectura()) {
-          <a [routerLink]="['editar']" class="link-editar">Editar cabecera</a>
-        }
+        <h2>Formula {{ formula()!.codigoFormula }}</h2>
       </header>
 
-      <section class="detalle" [class.solo-lectura]="soloLectura()">
-        <h3>Ingredientes (lote {{ PESO_LOTE }} kg)</h3>
-        @if (!soloLectura()) {
-          <p class="hint">
-            La suma de cantidades debe ser exactamente {{ PESO_LOTE }} kg para guardar y salir.
-          </p>
-        }
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Cabecera</h3>
+          <div class="panel-acciones">
+            @if (!editandoCabecera()) {
+              <button
+                type="button"
+                class="secundario"
+                [disabled]="editandoDetalle()"
+                (click)="iniciarEdicionCabecera()"
+              >
+                Editar
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="primario"
+                [disabled]="guardandoCabecera() || !puedeGuardarCabecera()"
+                (click)="guardarCabecera()"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                class="secundario"
+                [disabled]="guardandoCabecera()"
+                (click)="cancelarEdicionCabecera()"
+              >
+                Cancelar
+              </button>
+            }
+          </div>
+        </div>
 
-        @for (linea of lineas(); track $index; let i = $index) {
-          <div class="linea">
-            @if (!soloLectura()) {
+        @if (!editandoCabecera()) {
+          <dl class="vista-datos">
+            <div>
+              <dt>Codigo</dt>
+              <dd>{{ formula()!.codigoFormula }}</dd>
+            </div>
+            <div>
+              <dt>Descripcion</dt>
+              <dd>{{ formula()!.descripcionFormula }}</dd>
+            </div>
+            <div>
+              <dt>Animal</dt>
+              <dd>{{ formula()!.descripcionAnimal }} ({{ formula()!.codigoAnimal }})</dd>
+            </div>
+            <div>
+              <dt>Costo de fabricacion</dt>
+              <dd>$ {{ formula()!.costoTotalFormula | number: '1.3-3' }}</dd>
+            </div>
+          </dl>
+        } @else {
+          <div class="formulario-cabecera">
+            <label>
+              Codigo
+              <input [(ngModel)]="codigoFormula" autocomplete="off" />
+            </label>
+            <label>
+              Descripcion
+              <input [(ngModel)]="descripcionFormula" autocomplete="off" />
+            </label>
+            <label class="autocomplete">
+              Animal
+              <input
+                [(ngModel)]="nombreAnimal"
+                (ngModelChange)="onNombreAnimalChange($event)"
+                (focus)="mostrarAnimales.set(true)"
+                (blur)="cerrarAnimales()"
+                autocomplete="off"
+              />
+              @if (mostrarAnimales() && animalesFiltrados().length) {
+                <ul class="dropdown">
+                  @for (a of animalesFiltrados(); track a.id) {
+                    <li (mousedown)="seleccionarAnimal(a)">{{ a.descripcionAnimal }}</li>
+                  }
+                </ul>
+              }
+            </label>
+          </div>
+          @if (errorCabecera()) {
+            <p class="error">{{ errorCabecera() }}</p>
+          }
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Detalle (ingredientes · lote {{ PESO_LOTE }} kg)</h3>
+          <div class="panel-acciones">
+            @if (!editandoDetalle()) {
+              <button
+                type="button"
+                class="secundario"
+                [disabled]="editandoCabecera()"
+                (click)="iniciarEdicionDetalle()"
+              >
+                Editar
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="primario"
+                [disabled]="guardandoDetalle() || !puedeGuardarDetalle()"
+                (click)="guardarDetalle()"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                class="secundario"
+                [disabled]="guardandoDetalle()"
+                (click)="cancelarEdicionDetalle()"
+              >
+                Cancelar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (!editandoDetalle()) {
+          @if (lineas().length) {
+            <table class="tabla-vista">
+              <thead>
+                <tr>
+                  <th>Codigo MP</th>
+                  <th>Materia prima</th>
+                  <th>Cantidad (kg)</th>
+                  <th>Precio/kg</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (linea of lineas(); track $index) {
+                  <tr>
+                    <td>{{ linea.codigo }}</td>
+                    <td>{{ linea.nombre }}</td>
+                    <td>{{ linea.cantidadKg | number: '1.3-3' }}</td>
+                    <td>$ {{ linea.precioPorKilo | number: '1.3-3' }}</td>
+                    <td>$ {{ linea.costoParcial | number: '1.3-3' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          } @else {
+            <p class="hint">Sin ingredientes cargados.</p>
+          }
+
+          <footer class="totales-vista">
+            <p>
+              Suma kg:
+              <strong [class.ok]="loteCompleto()" [class.bad]="!loteCompleto()">
+                {{ sumaKg() | number: '1.3-3' }}
+              </strong>
+              / {{ PESO_LOTE }} kg
+            </p>
+            @if (!loteCompleto() && lineasConMateria().length) {
+              <p class="warn">
+                Faltan {{ kilosFaltantesUi() | number: '1.3-3' }} kg para completar la formula.
+              </p>
+            }
+            <p>
+              Costo total estimado:
+              <strong>$ {{ costoTotalUi() | number: '1.3-3' }}</strong>
+            </p>
+          </footer>
+        } @else {
+          <p class="hint">
+            La suma de cantidades debe ser exactamente {{ PESO_LOTE }} kg para guardar.
+          </p>
+
+          @for (linea of lineas(); track $index; let i = $index) {
+            <div class="linea">
               <div class="mp-autocomplete">
                 <label>
                   Codigo MP
@@ -91,125 +243,166 @@ import {
                   (ngModelChange)="onCantidadChange(i, $event)"
                 />
               </label>
-            } @else {
-              <span class="mp-readonly">{{ linea.nombre }} ({{ linea.codigo }})</span>
-              <span>{{ linea.cantidadKg | number: '1.3-3' }} kg</span>
-            }
-            <label>
-              Precio/kg
-              <input
-                type="number"
-                [readOnly]="true"
-                [ngModel]="linea.precioPorKilo"
-              />
-            </label>
-            <label>
-              Subtotal
-              <input type="number" [readOnly]="true" [ngModel]="linea.costoParcial" />
-            </label>
-            @if (!soloLectura()) {
+              <label>
+                Precio/kg
+                <input type="number" [readOnly]="true" [ngModel]="linea.precioPorKilo" />
+              </label>
+              <label>
+                Subtotal
+                <input type="number" [readOnly]="true" [ngModel]="linea.costoParcial" />
+              </label>
               <button type="button" class="danger" (click)="quitarLinea(i)">Quitar</button>
+            </div>
+          }
+
+          <button type="button" class="btn-secundario" (click)="agregarLinea()">
+            + Agregar ingrediente
+          </button>
+
+          <footer class="totales">
+            <p>
+              Suma kg:
+              <strong [class.ok]="loteCompleto()" [class.bad]="!loteCompleto()">
+                {{ sumaKg() | number: '1.3-3' }}
+              </strong>
+              / {{ PESO_LOTE }} kg
+            </p>
+            @if (!loteCompleto() && lineasConMateria().length) {
+              <p class="warn">
+                Faltan {{ kilosFaltantesUi() | number: '1.3-3' }} kg para completar la formula.
+              </p>
             }
-          </div>
+            @if (loteCompleto()) {
+              <p class="ok-hint">Lote completo. Guardá para persistir el costo de formula.</p>
+            }
+            <p>
+              Costo total estimado:
+              <strong>$ {{ costoTotalUi() | number: '1.3-3' }}</strong>
+            </p>
+            @if (conflictoDetalle()) {
+              <p class="conflicto">{{ conflictoDetalle() }}</p>
+            }
+            @if (errorDetalle()) {
+              <p class="error">{{ errorDetalle() }}</p>
+            }
+          </footer>
         }
-
-        @if (!soloLectura()) {
-          <button type="button" class="secundario" (click)="agregarLinea()">+ Agregar ingrediente</button>
-        }
-
-        <footer class="totales">
-          <p>
-            Suma kg:
-            <strong [class.ok]="loteCompleto()" [class.bad]="!loteCompleto()">
-              {{ sumaKg() | number: '1.3-3' }}
-            </strong>
-            / {{ PESO_LOTE }} kg
-          </p>
-          @if (!loteCompleto() && lineasConMateria().length) {
-            <p class="warn">Faltan {{ kilosFaltantesUi() | number: '1.3-3' }} kg para completar la formula.</p>
-          }
-          @if (loteCompleto() && !soloLectura()) {
-            <p class="ok-hint">Lote completo. Guardá para persistir el costo de formula.</p>
-          }
-          <p>
-            Costo total estimado:
-            <strong>$ {{ costoTotalUi() | number: '1.3-3' }}</strong>
-          </p>
-          @if (!soloLectura()) {
-            <button type="button" [disabled]="!puedeGuardar() || guardando()" (click)="guardar()">
-              Guardar formula completa
-            </button>
-          }
-          @if (error()) {
-            <p class="error">{{ error() }}</p>
-          }
-        </footer>
       </section>
     }
   `,
   styles: [
+    GRANJA_VISTA_STYLES,
     `
-      .back {
-        color: #166534;
+      :host {
+        display: block;
+      }
+      .pagina-cabecera {
+        margin-bottom: 0.5rem;
+      }
+      .formulario-cabecera {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .formulario-cabecera label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+        min-width: 180px;
+      }
+      .autocomplete {
+        position: relative;
+        min-width: 220px;
+      }
+      .dropdown {
+        position: absolute;
+        z-index: 10;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        max-height: 180px;
+        overflow-y: auto;
+      }
+      .dropdown li {
+        padding: 0.4rem 0.55rem;
         cursor: pointer;
       }
-      dl {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 0.75rem;
+      .dropdown li:hover {
+        background: #ecfdf5;
       }
-      dt {
+      input {
+        padding: 0.4rem 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        min-width: 100px;
+      }
+      input[readonly] {
+        background: #f3f4f6;
+      }
+      .tabla-vista {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+      .tabla-vista th,
+      .tabla-vista td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+      }
+      .tabla-vista th {
         font-size: 0.75rem;
         color: #6b7280;
-      }
-      dd {
-        margin: 0;
         font-weight: 600;
-      }
-      .link-editar {
-        color: #166534;
       }
       .linea {
         display: flex;
         flex-wrap: wrap;
-        gap: 1rem;
+        gap: 0.75rem;
+        align-items: flex-end;
         padding: 1rem 0;
         border-bottom: 1px solid #e5e7eb;
-        align-items: flex-end;
       }
-      label {
+      .mp-autocomplete {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .linea label {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
         font-size: 0.85rem;
       }
-      .autocomplete {
-        position: relative;
-        min-width: 200px;
+      .totales,
+      .totales-vista {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e5e7eb;
       }
-      .dropdown {
-        position: absolute;
-        z-index: 10;
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        background: white;
-        border: 1px solid #d1d5db;
-        width: 100%;
-        max-height: 180px;
-        overflow-y: auto;
-      }
-      .dropdown li {
-        padding: 0.5rem;
-        cursor: pointer;
-      }
-      input {
-        padding: 0.4rem;
-        border: 1px solid #d1d5db;
+      .btn-secundario,
+      button.danger {
+        padding: 0.45rem 0.9rem;
+        border: none;
         border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
       }
-      input[readonly] {
-        background: #f3f4f6;
+      .btn-secundario {
+        background: #374151;
+        color: white;
+        margin-top: 0.75rem;
+      }
+      button.danger {
+        background: #b91c1c;
+        color: white;
       }
       .warn {
         color: #b45309;
@@ -224,32 +417,6 @@ import {
       .bad {
         color: #b91c1c;
       }
-      button {
-        padding: 0.5rem 1rem;
-        background: #166534;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      button.secundario {
-        background: #6b7280;
-      }
-      button.danger {
-        background: #b91c1c;
-      }
-      button:disabled {
-        opacity: 0.5;
-      }
-      .error {
-        color: #b91c1c;
-      }
-      .hint {
-        color: #6b7280;
-      }
-      .solo-lectura .linea {
-        opacity: 0.95;
-      }
     `,
   ],
 })
@@ -258,22 +425,31 @@ export class FormulaDetalleComponent implements OnInit {
 
   private readonly api = inject(ReformaApiService);
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
 
   readonly formula = signal<FormulaCompleta | null>(null);
   readonly lineas = signal<LineaFormulaUi[]>([]);
   readonly materiasPrimas = signal<MateriaPrima[]>([]);
+  readonly animales = signal<Animal[]>([]);
   readonly mpAbiertoIndex = signal<number | null>(null);
+  readonly mostrarAnimales = signal(false);
+  readonly idAnimalSeleccionado = signal<number | null>(null);
+
   readonly cargando = signal(true);
-  readonly guardando = signal(false);
-  readonly error = signal<string | null>(null);
+  readonly guardandoCabecera = signal(false);
+  readonly guardandoDetalle = signal(false);
+  readonly errorCabecera = signal<string | null>(null);
+  readonly errorDetalle = signal<string | null>(null);
+  readonly conflictoDetalle = signal<string | null>(null);
+
+  readonly editandoCabecera = signal(false);
+  readonly editandoDetalle = signal(false);
   readonly hayCambiosSinGuardar = signal(false);
 
-  private sincronizandoMp = false;
+  codigoFormula = '';
+  descripcionFormula = '';
+  nombreAnimal = '';
 
-  readonly soloLectura = computed(
-    () => this.route.snapshot.queryParamMap.get('modo') === 'ver',
-  );
+  private sincronizandoMp = false;
 
   readonly lineasConMateria = computed(() =>
     this.lineas().filter((l) => l.idMateriaPrima != null && l.cantidadKg > 0),
@@ -291,8 +467,21 @@ export class FormulaDetalleComponent implements OnInit {
 
   readonly loteCompleto = computed(() => sumaKgCompleta(this.sumaKg()));
 
-  readonly puedeGuardar = computed(() => {
-    if (this.soloLectura()) return false;
+  readonly animalesFiltrados = computed(() => {
+    const t = this.nombreAnimal.trim().toLowerCase();
+    if (!t) return this.animales();
+    return this.animales().filter((a) => a.descripcionAnimal.toLowerCase().includes(t));
+  });
+
+  readonly puedeGuardarCabecera = computed(() => {
+    return (
+      this.codigoFormula.trim().length > 0 &&
+      this.descripcionFormula.trim().length > 0 &&
+      this.idAnimalSeleccionado() != null
+    );
+  });
+
+  readonly puedeGuardarDetalle = computed(() => {
     return (
       this.loteCompleto() &&
       this.lineasConMateria().length > 0 &&
@@ -312,6 +501,9 @@ export class FormulaDetalleComponent implements OnInit {
     this.api.getMateriasPrimas(this.idGranja).subscribe({
       next: (list) => this.materiasPrimas.set(list),
     });
+    this.api.getAnimales(this.idGranja).subscribe({
+      next: (list) => this.animales.set(list),
+    });
     this.cargar();
   }
 
@@ -320,21 +512,134 @@ export class FormulaDetalleComponent implements OnInit {
     this.api.getFormula(this.idGranja, this.idFormula).subscribe({
       next: (f) => {
         this.formula.set(f);
-        if (f.lineas.length > 0) {
-          this.lineas.set(f.lineas.map(lineaDesdeFormula));
-        } else if (!this.soloLectura()) {
-          this.lineas.set([lineaFormulaVacia()]);
-        } else {
-          this.lineas.set([]);
-        }
+        this.restaurarLineasDesdeFormula(f);
         this.hayCambiosSinGuardar.set(false);
         this.cargando.set(false);
       },
       error: () => {
-        this.error.set('No se pudo cargar la formula');
+        this.errorDetalle.set('No se pudo cargar la formula');
         this.cargando.set(false);
       },
     });
+  }
+
+  iniciarEdicionCabecera(): void {
+    const f = this.formula();
+    if (!f) return;
+    this.codigoFormula = f.codigoFormula;
+    this.descripcionFormula = f.descripcionFormula;
+    this.nombreAnimal = f.descripcionAnimal;
+    this.idAnimalSeleccionado.set(f.idAnimal);
+    this.errorCabecera.set(null);
+    this.editandoCabecera.set(true);
+  }
+
+  cancelarEdicionCabecera(): void {
+    this.editandoCabecera.set(false);
+    this.errorCabecera.set(null);
+    this.mostrarAnimales.set(false);
+  }
+
+  guardarCabecera(): void {
+    if (!this.puedeGuardarCabecera()) return;
+    const idAnimal = this.idAnimalSeleccionado();
+    if (!idAnimal) return;
+
+    this.guardandoCabecera.set(true);
+    this.errorCabecera.set(null);
+    this.api
+      .actualizarFormulaCabecera(this.idGranja, this.idFormula, {
+        codigoFormula: this.codigoFormula.trim(),
+        descripcionFormula: this.descripcionFormula.trim(),
+        idAnimal,
+      })
+      .subscribe({
+        next: () => {
+          this.guardandoCabecera.set(false);
+          this.editandoCabecera.set(false);
+          this.cargar();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.guardandoCabecera.set(false);
+          this.errorCabecera.set(mensajeErrorHttp(err, 'No se pudo guardar la cabecera'));
+        },
+      });
+  }
+
+  iniciarEdicionDetalle(): void {
+    const f = this.formula();
+    if (this.lineas().length === 0) {
+      if (f && f.lineas.length > 0) {
+        this.restaurarLineasDesdeFormula(f);
+      } else {
+        this.lineas.set([lineaFormulaVacia()]);
+      }
+    }
+    this.conflictoDetalle.set(null);
+    this.errorDetalle.set(null);
+    this.hayCambiosSinGuardar.set(false);
+    this.editandoDetalle.set(true);
+  }
+
+  cancelarEdicionDetalle(): void {
+    const f = this.formula();
+    if (f) this.restaurarLineasDesdeFormula(f);
+    this.editandoDetalle.set(false);
+    this.conflictoDetalle.set(null);
+    this.errorDetalle.set(null);
+    this.hayCambiosSinGuardar.set(false);
+    this.mpAbiertoIndex.set(null);
+  }
+
+  guardarDetalle(): void {
+    if (!this.loteCompleto()) {
+      this.conflictoDetalle.set(
+        `Completá el detalle: la suma de ingredientes debe ser exactamente ${PESO_LOTE_FORMULA_KG} kg. Faltan ${this.kilosFaltantesUi()} kg.`,
+      );
+      return;
+    }
+    if (!this.puedeGuardarDetalle()) return;
+
+    this.guardandoDetalle.set(true);
+    this.conflictoDetalle.set(null);
+    this.errorDetalle.set(null);
+    this.api
+      .guardarFormulaDetalle(this.idGranja, this.idFormula, {
+        lineas: this.lineasConMateria().map((l) => ({
+          idMateriaPrima: l.idMateriaPrima!,
+          cantidadKg: l.cantidadKg,
+        })),
+      })
+      .subscribe({
+        next: () => {
+          this.guardandoDetalle.set(false);
+          this.editandoDetalle.set(false);
+          this.hayCambiosSinGuardar.set(false);
+          this.cargar();
+        },
+        error: (err: HttpErrorResponse) => {
+          this.guardandoDetalle.set(false);
+          this.errorDetalle.set(mensajeErrorHttp(err, 'No se pudo guardar el detalle'));
+        },
+      });
+  }
+
+  cerrarAnimales(): void {
+    setTimeout(() => this.mostrarAnimales.set(false), 150);
+  }
+
+  onNombreAnimalChange(nombre: string): void {
+    this.mostrarAnimales.set(true);
+    const a = this.animales().find(
+      (x) => x.descripcionAnimal.toLowerCase() === nombre.trim().toLowerCase(),
+    );
+    this.idAnimalSeleccionado.set(a?.id ?? null);
+  }
+
+  seleccionarAnimal(a: Animal): void {
+    this.idAnimalSeleccionado.set(a.id);
+    this.nombreAnimal = a.descripcionAnimal;
+    this.mostrarAnimales.set(false);
   }
 
   materiasFiltradas(termino: string): MateriaPrima[] {
@@ -408,50 +713,33 @@ export class FormulaDetalleComponent implements OnInit {
     this.lineas.update((p) => p.filter((_, idx) => idx !== i));
   }
 
-  guardar(): void {
-    if (!this.puedeGuardar()) return;
-    this.guardando.set(true);
-    this.api
-      .guardarFormulaDetalle(this.idGranja, this.idFormula, {
-        lineas: this.lineasConMateria().map((l) => ({
-          idMateriaPrima: l.idMateriaPrima!,
-          cantidadKg: l.cantidadKg,
-        })),
-      })
-      .subscribe({
-        next: () => {
-          this.guardando.set(false);
-          this.hayCambiosSinGuardar.set(false);
-          void this.router.navigate(['..'], { relativeTo: this.route });
-        },
-        error: (err: HttpErrorResponse) => {
-          this.guardando.set(false);
-          this.error.set(mensajeErrorHttp(err, 'No se pudo guardar la formula'));
-        },
-      });
-  }
-
   intentarVolver(event: Event): void {
     if (!this.puedeSalir()) event.preventDefault();
   }
 
   puedeSalir(): boolean {
-    if (this.soloLectura()) return true;
-    if (!this.hayCambiosSinGuardar() && this.formula()?.completa) return true;
-    if (!this.hayCambiosSinGuardar() && this.lineasConMateria().length === 0) return true;
-    if (!this.hayCambiosSinGuardar() && this.loteCompleto()) return true;
-    return false;
+    return !(this.editandoDetalle() && this.hayCambiosSinGuardar());
   }
 
   mensajeBloqueoSalida(): string {
-    if (!this.loteCompleto()) {
-      return `La formula debe sumar ${PESO_LOTE_FORMULA_KG} kg. Faltan ${this.kilosFaltantesUi()} kg.`;
+    if (this.editandoDetalle() && this.hayCambiosSinGuardar()) {
+      return 'Tenés cambios sin guardar en el detalle. Guardá o cancelá la edición antes de salir.';
     }
-    return 'Tenés cambios sin guardar. Guardá la formula completa antes de salir.';
+    return 'No podés salir todavía.';
   }
 
   private marcarModificado(): void {
-    this.hayCambiosSinGuardar.set(true);
+    if (this.editandoDetalle()) {
+      this.hayCambiosSinGuardar.set(true);
+    }
+  }
+
+  private restaurarLineasDesdeFormula(f: FormulaCompleta): void {
+    if (f.lineas.length > 0) {
+      this.lineas.set(f.lineas.map(lineaDesdeFormula));
+    } else {
+      this.lineas.set([]);
+    }
   }
 
   private aplicarMp(lineas: LineaFormulaUi[], index: number, mp: MateriaPrima): void {

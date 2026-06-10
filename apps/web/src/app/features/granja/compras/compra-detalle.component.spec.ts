@@ -51,8 +51,9 @@ describe('CompraDetalleComponent — salida', () => {
     expect(component.puedeSalir()).toBeTrue();
   });
 
-  it('bloquea salida con cambios sin guardar aunque totales cuadren', () => {
+  it('bloquea salida con cambios sin guardar en detalle', () => {
     fijarLineasSinCambios();
+    component.editandoDetalle.set(true);
     component.compra.set({
       id: 'c1',
       numeroFactura: 'F-30M',
@@ -73,12 +74,13 @@ describe('CompraDetalleComponent — salida', () => {
     });
 
     expect(component.totalesCuadran()).toBeTrue();
-    expect(component.puedeGuardar()).toBeTrue();
+    expect(component.puedeGuardarDetalle()).toBeTrue();
     expect(component.puedeSalir()).toBeFalse();
     expect(component.mensajeBloqueoSalida()).toContain('sin guardar');
   });
 
   it('permite salir tras sincronizar snapshot (guardado exitoso)', () => {
+    component.editandoDetalle.set(true);
     fijarLineasSinCambios();
     component.lineas.update((lineas) => {
       const copia = [...lineas];
@@ -88,6 +90,7 @@ describe('CompraDetalleComponent — salida', () => {
     expect(component.puedeSalir()).toBeFalse();
 
     component['establecerSnapshotLineas']();
+    component.editandoDetalle.set(false);
     expect(component.puedeSalir()).toBeTrue();
   });
 
@@ -125,13 +128,18 @@ describe('CompraDetalleComponent — salida', () => {
     expect(component.lineas()[0].subtotal).toBe(30_000);
     expect(component.sumaSubtotales()).toBe(30_000);
     expect(component.totalesCuadran()).toBeTrue();
-    expect(component.puedeGuardar()).toBeTrue();
+    expect(component.puedeGuardarDetalle()).toBeTrue();
   });
 
-  it('bloquea salida en factura vacía', () => {
+  it('bloquea salida mientras se edita la cabecera', () => {
+    component.editandoCabecera.set(true);
+    expect(component.puedeSalir()).toBeFalse();
+    expect(component.mensajeBloqueoSalida()).toContain('cabecera');
+  });
+
+  it('permite salir con factura vacía en modo vista', () => {
     component.lineas.set([]);
     component['establecerSnapshotLineas']();
-    expect(component.puedeSalir()).toBeFalse();
-    expect(component.mensajeBloqueoSalida()).toContain('no tiene ítems');
+    expect(component.puedeSalir()).toBeTrue();
   });
 });

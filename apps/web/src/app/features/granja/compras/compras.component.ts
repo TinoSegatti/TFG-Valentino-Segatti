@@ -74,10 +74,7 @@ import { CompraResumen, textoConfirmacionEliminarFactura } from '../../../data/m
                     <span [class.borrador]="c.estado === 'BORRADOR'">{{ c.estado }}</span>
                   </td>
                   <td class="acciones">
-                    <a [routerLink]="[c.id]">{{
-                      c.estado === 'BORRADOR' ? 'Detalle' : 'Ver / editar ítems'
-                    }}</a>
-                    <a [routerLink]="[c.id, 'editar']" class="link">Editar</a>
+                    <a [routerLink]="[c.id]">Ver</a>
                     <button type="button" class="link danger-text" (click)="iniciarEliminar(c)">
                       Eliminar
                     </button>

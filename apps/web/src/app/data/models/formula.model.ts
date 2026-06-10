@@ -64,6 +64,10 @@ export interface LineaFormulaUi {
   advertenciaLinea?: string;
 }
 
+export function textoConfirmacionEliminarFormula(codigoFormula: string): string {
+  return `ELIMINAR FORMULA ${codigoFormula}`;
+}
+
 export function redondearFormula(valor: number): number {
   const f = Math.pow(10, DECIMALES_FORMULA);
   return Math.round(valor * f) / f;

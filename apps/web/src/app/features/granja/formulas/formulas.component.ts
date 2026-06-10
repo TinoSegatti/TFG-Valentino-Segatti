@@ -1,22 +1,47 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
-import { FormulaResumen } from '../../../data/models/formula.model';
+import { FormulaResumen, textoConfirmacionEliminarFormula } from '../../../data/models/formula.model';
 
 @Component({
   selector: 'app-formulas',
   standalone: true,
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, FormsModule],
   template: `
     <header class="toolbar">
       <h2>Formulas dietarias</h2>
       <a routerLink="nueva" class="btn-nueva">Crear formula</a>
     </header>
 
-    <section class="lista">
+    @if (formulaEliminando()) {
+      <section class="panel eliminar">
+        <h3>Eliminar formula {{ formulaEliminando()!.codigoFormula }}</h3>
+        <p>Escribi exactamente la frase siguiente para confirmar:</p>
+        <code class="frase">{{ fraseEliminarEsperada() }}</code>
+        <label>
+          Confirmacion
+          <input [(ngModel)]="textoConfirmacionEliminar" autocomplete="off" />
+        </label>
+        <div class="acciones-form">
+          <button
+            type="button"
+            class="danger"
+            [disabled]="!puedeConfirmarEliminar() || guardando()"
+            (click)="confirmarEliminar()"
+          >
+            Eliminar formula
+          </button>
+          <button type="button" class="secundario" (click)="cancelarEliminar()">Cancelar</button>
+        </div>
+      </section>
+    }
+
+    @if (!formulaEliminando()) {
+      <section class="lista">
       @if (cargando()) {
         <p>Cargando…</p>
       } @else if (formulas().length === 0) {
@@ -46,9 +71,8 @@ import { FormulaResumen } from '../../../data/models/formula.model';
                   }}</span>
                 </td>
                 <td class="acciones">
-                  <a [routerLink]="[f.id]" [queryParams]="{ modo: 'ver' }">Ver</a>
-                  <a [routerLink]="[f.id]" class="link">Editar</a>
-                  <button type="button" class="link danger-text" (click)="eliminar(f)">
+                  <a [routerLink]="[f.id]">Ver</a>
+                  <button type="button" class="link danger-text" (click)="iniciarEliminar(f)">
                     Eliminar
                   </button>
                 </td>
@@ -57,7 +81,8 @@ import { FormulaResumen } from '../../../data/models/formula.model';
           </tbody>
         </table>
       }
-    </section>
+      </section>
+    }
 
     @if (error()) {
       <p class="error">{{ error() }}</p>
@@ -123,6 +148,39 @@ import { FormulaResumen } from '../../../data/models/formula.model';
       .error {
         color: #b91c1c;
       }
+      .panel.eliminar {
+        margin: 1.25rem 0;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: #fafafa;
+      }
+      .frase {
+        display: block;
+        padding: 0.5rem;
+        background: #fef3c7;
+        border-radius: 4px;
+      }
+      button.danger {
+        background: #b91c1c;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button.secundario {
+        background: #e5e7eb;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .acciones-form {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+      }
     `,
   ],
 })
@@ -132,7 +190,12 @@ export class FormulasComponent implements OnInit {
 
   readonly formulas = signal<FormulaResumen[]>([]);
   readonly cargando = signal(true);
+  readonly guardando = signal(false);
   readonly error = signal<string | null>(null);
+  readonly formulaEliminando = signal<FormulaResumen | null>(null);
+  readonly fraseEliminarEsperada = signal('');
+
+  textoConfirmacionEliminar = '';
 
   private get idGranja(): string {
     return this.route.parent?.snapshot.paramMap.get('idGranja') ?? '';
@@ -142,12 +205,36 @@ export class FormulasComponent implements OnInit {
     this.recargar();
   }
 
-  eliminar(f: FormulaResumen): void {
-    if (!confirm(`Eliminar la formula ${f.codigoFormula}?`)) return;
+  iniciarEliminar(f: FormulaResumen): void {
+    this.formulaEliminando.set(f);
+    this.fraseEliminarEsperada.set(textoConfirmacionEliminarFormula(f.codigoFormula));
+    this.textoConfirmacionEliminar = '';
+  }
+
+  cancelarEliminar(): void {
+    this.formulaEliminando.set(null);
+    this.textoConfirmacionEliminar = '';
+    this.fraseEliminarEsperada.set('');
+  }
+
+  puedeConfirmarEliminar(): boolean {
+    return this.textoConfirmacionEliminar.trim() === this.fraseEliminarEsperada();
+  }
+
+  confirmarEliminar(): void {
+    const f = this.formulaEliminando();
+    if (!f || !this.puedeConfirmarEliminar()) return;
+    this.guardando.set(true);
     this.api.desactivarFormula(this.idGranja, f.id).subscribe({
-      next: () => this.recargar(),
-      error: (err: HttpErrorResponse) =>
-        this.error.set(mensajeErrorHttp(err, 'No se pudo eliminar la formula')),
+      next: () => {
+        this.guardando.set(false);
+        this.cancelarEliminar();
+        this.recargar();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.guardando.set(false);
+        this.error.set(mensajeErrorHttp(err, 'No se pudo eliminar la formula'));
+      },
     });
   }
 
