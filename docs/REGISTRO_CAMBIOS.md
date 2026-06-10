@@ -17,6 +17,30 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-03 — UX unificada: Ver + Eliminar en tablas, edición en paneles
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - Listados de **Compras**, **Formulas** y **Fabricaciones**: solo acciones **Ver** y **Eliminar** (doble confirmación con frase).
+  - Pantalla **Ver**: dos contenedores (Cabecera / Detalle) en modo lectura; botón **Editar** en cada panel activa edición local con Guardar/Cancelar.
+  - Validación cruzada: al guardar cabecera o detalle con datos inconsistentes (ej. total factura vs suma ítems) se advierte qué sección editar.
+  - Rutas `/editar` eliminadas; lógica fusionada en `*-detalle.component.ts`.
+  - Estilos compartidos `shared/granja-vista.styles.ts`.
+- **Archivos principales:** `compra-detalle`, `formula-detalle`, `fabricacion-detalle`, listados, `app.routes.ts`, `formula.model.ts` (frase eliminar).
+- **Pendiente:** catálogos MP/proveedores/animales aún usan patrón anterior (alta rápida + baja simple).
+
+### 2026-06-03 — Modulo Fabricaciones / egresos (RF-FAB)
+- **Autor/agente:** Cursor Agent
+- **Que:**
+  - Migracion `V009__fabricaciones_codigo_estado.sql`: codigo de negocio, estado `BORRADOR`/`REGISTRADA`, `id_formula` nullable en borrador, snapshots de formula y MP en detalle.
+  - Backend `domain/fabricaciones/`: entidades, repos, `FabricacionCalculo`, `FabricacionService`, REST `/api/fabricaciones/{idGranja}`.
+  - Flujo: cabecera (codigo, fecha, descripcion) → detalle (formula por codigo/descripcion + veces). Costo = `costoTotalFormula` al momento del registro × veces (congelado; no se recalcula si cambian precios MP).
+  - Consumo stock: `cantidadKg_formula × veces` por MP; hook en `InventarioRecalculoService` (resta fabricaciones `REGISTRADAS` activas).
+  - `PlanService.limiteFabricaciones`: DEMO 5 / STARTER 50 / BUSINESS 500 / ENTERPRISE ∞.
+  - Frontend Angular: listado (fecha `dd/MM/yyyy`), nueva cabecera, editar cabecera, detalle con autocomplete cruzado de formulas, eliminar con confirmacion.
+  - Tests: `FabricacionCalculoTest`; `InventarioRecalculoServiceTest` actualizado con resta por fabricaciones.
+- **Archivos principales:** `V009`, `domain/fabricaciones/*`, `InventarioRecalculoService.java`, `PlanService.java`, `apps/web/.../fabricaciones/*`, `fabricacion.model.ts`, `reforma-api.service.ts`, `app.routes.ts`, `granja-shell.component.ts`.
+- **Pendiente:** `mvn test` / IT de integracion fabricacion+inventario; commit + push.
+
 ### 2026-06-05 — Estabilizacion Compras e Inventario (fixes UI + backend)
 - **Autor/agente:** Cursor Agent
 - **Que:**
