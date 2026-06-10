@@ -17,6 +17,7 @@ import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@ang
       <a routerLink="animales" routerLinkActive="active">Animales</a>
       <a routerLink="compras" routerLinkActive="active">Compras</a>
       <a routerLink="formulas" routerLinkActive="active">Formulas</a>
+      <a routerLink="fabricaciones" routerLinkActive="active">Fabricaciones</a>
       <a routerLink="inventario" routerLinkActive="active">Inventario</a>
     </aside>
     <main class="content">

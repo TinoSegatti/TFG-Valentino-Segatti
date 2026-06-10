@@ -65,13 +65,6 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'compras/:idCompra/editar',
-        loadComponent: () =>
-          import('./features/granja/compras/compra-editar.component').then(
-            (m) => m.CompraEditarComponent,
-          ),
-      },
-      {
         path: 'compras/:idCompra',
         canDeactivate: [compraDetalleCanDeactivate],
         loadComponent: () =>
@@ -94,18 +87,32 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'formulas/:idFormula/editar',
-        loadComponent: () =>
-          import('./features/granja/formulas/formula-editar.component').then(
-            (m) => m.FormulaEditarComponent,
-          ),
-      },
-      {
         path: 'formulas/:idFormula',
         canDeactivate: [formulaDetalleCanDeactivate],
         loadComponent: () =>
           import('./features/granja/formulas/formula-detalle.component').then(
             (m) => m.FormulaDetalleComponent,
+          ),
+      },
+      {
+        path: 'fabricaciones',
+        loadComponent: () =>
+          import('./features/granja/fabricaciones/fabricaciones.component').then(
+            (m) => m.FabricacionesComponent,
+          ),
+      },
+      {
+        path: 'fabricaciones/nueva',
+        loadComponent: () =>
+          import('./features/granja/fabricaciones/fabricacion-nueva.component').then(
+            (m) => m.FabricacionNuevaComponent,
+          ),
+      },
+      {
+        path: 'fabricaciones/:idFabricacion',
+        loadComponent: () =>
+          import('./features/granja/fabricaciones/fabricacion-detalle.component').then(
+            (m) => m.FabricacionDetalleComponent,
           ),
       },
       {

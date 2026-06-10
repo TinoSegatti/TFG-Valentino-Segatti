@@ -4,6 +4,7 @@ import com.reforma.domain.common.util.IdGenerator;
 import com.reforma.domain.compras.domain.EstadoCompra;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.compras.support.CompraTotalesMateriaPrima;
+import com.reforma.domain.fabricaciones.repository.FabricacionDetalleRepository;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.inventario.entity.Inventario;
@@ -23,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Recalcula registros de {@code t_inventario} para una granja a partir de compras REGISTRADAS,
- * inventario inicial y (futuro) fabricaciones. Mantiene el ajuste manual del usuario en
+ * inventario inicial y fabricaciones REGISTRADAS activas. Mantiene el ajuste manual del usuario en
  * {@code cantidad_real} preservando la diferencia (real - sistema).
  */
 @Service
@@ -33,6 +34,7 @@ public class InventarioRecalculoService {
     private final InventarioRepository inventarioRepository;
     private final InventarioInicialRepository inventarioInicialRepository;
     private final CompraDetalleRepository compraDetalleRepository;
+    private final FabricacionDetalleRepository fabricacionDetalleRepository;
     private final MateriaPrimaRepository materiaPrimaRepository;
     private final GranjaRepository granjaRepository;
 
@@ -57,7 +59,9 @@ public class InventarioRecalculoService {
         double dineroCompras = totales != null ? totales.totalDinero() : 0.0;
 
         double cantidadAcumulada = InventarioCalculo.redondear(cantidadInicial + kilosCompras);
-        double kilosUsadosFabricaciones = 0.0; // TODO(RF-FAB): restar fabricaciones cuando exista.
+        double kilosUsadosFabricaciones = Optional.ofNullable(
+                        fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(idGranja, idMateriaPrima))
+                .orElse(0.0);
         double cantidadSistema = InventarioCalculo.redondear(cantidadAcumulada - kilosUsadosFabricaciones);
 
         double totalKilosPonderado = cantidadInicial + kilosCompras;
@@ -118,12 +122,5 @@ public class InventarioRecalculoService {
             inv.setFechaUltimaActualizacion(Instant.now());
         }
         return inventarioRepository.save(inv);
-    }
-
-    private static double toDouble(Object valor) {
-        if (valor instanceof Number n) {
-            return n.doubleValue();
-        }
-        return 0.0;
     }
 }

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import com.reforma.domain.compras.domain.EstadoCompra;
 import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.compras.support.CompraTotalesMateriaPrima;
+import com.reforma.domain.fabricaciones.repository.FabricacionDetalleRepository;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.inventario.entity.Inventario;
@@ -32,6 +33,7 @@ class InventarioRecalculoServiceTest {
     @Mock private InventarioRepository inventarioRepository;
     @Mock private InventarioInicialRepository inventarioInicialRepository;
     @Mock private CompraDetalleRepository compraDetalleRepository;
+    @Mock private FabricacionDetalleRepository fabricacionDetalleRepository;
     @Mock private MateriaPrimaRepository materiaPrimaRepository;
     @Mock private GranjaRepository granjaRepository;
 
@@ -61,6 +63,7 @@ class InventarioRecalculoServiceTest {
                 .thenReturn(Optional.empty());
         when(compraDetalleRepository.totalPorMateriaPrima(eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA)))
                 .thenReturn(new com.reforma.domain.compras.support.CompraTotalesMateriaPrima(150.0, 1600.0));
+        when(fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(ID_GRANJA, 10L)).thenReturn(0.0);
         when(inventarioRepository.findByGranjaIdAndMateriaPrimaId(ID_GRANJA, 10L)).thenReturn(Optional.empty());
         when(granjaRepository.findById(ID_GRANJA)).thenReturn(Optional.of(granja));
         when(inventarioRepository.save(any(Inventario.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -83,6 +86,7 @@ class InventarioRecalculoServiceTest {
                 .thenReturn(Optional.empty());
         when(compraDetalleRepository.totalPorMateriaPrima(eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA)))
                 .thenReturn(CompraTotalesMateriaPrima.vacio());
+        when(fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(ID_GRANJA, 10L)).thenReturn(0.0);
         when(inventarioRepository.findByGranjaIdAndMateriaPrimaId(ID_GRANJA, 10L))
                 .thenReturn(Optional.empty());
 
@@ -112,15 +116,16 @@ class InventarioRecalculoServiceTest {
                 .thenReturn(Optional.empty());
         when(compraDetalleRepository.totalPorMateriaPrima(eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA)))
                 .thenReturn(new com.reforma.domain.compras.support.CompraTotalesMateriaPrima(150.0, 1600.0));
+        when(fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(ID_GRANJA, 10L)).thenReturn(500.0);
         when(inventarioRepository.findByGranjaIdAndMateriaPrimaId(ID_GRANJA, 10L))
                 .thenReturn(Optional.of(existente));
         when(inventarioRepository.save(any(Inventario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Inventario inv = service.recalcular(ID_GRANJA, 10L);
 
-        assertThat(inv.getCantidadSistema()).isEqualTo(150.0);
-        // diferencia manual era -5 (95 - 100), se conserva → real = 145
-        assertThat(inv.getCantidadReal()).isEqualTo(145.0);
+        assertThat(inv.getCantidadSistema()).isEqualTo(100.0); // 150 acum - 50 fab
+        // diferencia manual era -5 (95 - 100), se conserva → real = 95
+        assertThat(inv.getCantidadReal()).isEqualTo(95.0);
         assertThat(inv.getMerma()).isEqualTo(5.0);
     }
 }

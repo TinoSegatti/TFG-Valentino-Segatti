@@ -48,4 +48,13 @@ class PlanServiceTest {
         assertThat(planService.limiteAnimales(PlanSuscripcion.ENTERPRISE))
                 .isEqualTo(Integer.MAX_VALUE);
     }
+
+    @Test
+    void limiteFabricacionesPorPlan() {
+        assertThat(planService.limiteFabricaciones(PlanSuscripcion.DEMO)).isEqualTo(5);
+        assertThat(planService.limiteFabricaciones(PlanSuscripcion.STARTER)).isEqualTo(50);
+        assertThat(planService.limiteFabricaciones(PlanSuscripcion.BUSINESS)).isEqualTo(500);
+        assertThat(planService.limiteFabricaciones(PlanSuscripcion.ENTERPRISE))
+                .isEqualTo(Integer.MAX_VALUE);
+    }
 }

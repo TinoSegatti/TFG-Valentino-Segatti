@@ -25,6 +25,12 @@ import {
   InventarioItem,
   InventarioListadoResponse,
 } from '../models/inventario.model';
+import {
+  FabricacionCabeceraRequest,
+  FabricacionCompleta,
+  FabricacionResumen,
+  GuardarFabricacionDetalleRequest,
+} from '../models/fabricacion.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -244,6 +250,55 @@ export class ReformaApiService {
     return this.http.post<InventarioListadoResponse>(
       `${this.base}/api/inventario/${idGranja}/recalcular`,
       {},
+    );
+  }
+
+  // === Fabricaciones ===
+  getFabricaciones(idGranja: string): Observable<FabricacionResumen[]> {
+    return this.http.get<FabricacionResumen[]>(`${this.base}/api/fabricaciones/${idGranja}`);
+  }
+
+  getFabricacion(idGranja: string, idFabricacion: string): Observable<FabricacionCompleta> {
+    return this.http.get<FabricacionCompleta>(
+      `${this.base}/api/fabricaciones/${idGranja}/${idFabricacion}`,
+    );
+  }
+
+  crearFabricacionCabecera(
+    idGranja: string,
+    request: FabricacionCabeceraRequest,
+  ): Observable<FabricacionCompleta> {
+    return this.http.post<FabricacionCompleta>(
+      `${this.base}/api/fabricaciones/${idGranja}`,
+      request,
+    );
+  }
+
+  actualizarFabricacionCabecera(
+    idGranja: string,
+    idFabricacion: string,
+    request: FabricacionCabeceraRequest,
+  ): Observable<FabricacionCompleta> {
+    return this.http.put<FabricacionCompleta>(
+      `${this.base}/api/fabricaciones/${idGranja}/${idFabricacion}`,
+      request,
+    );
+  }
+
+  guardarFabricacionDetalle(
+    idGranja: string,
+    idFabricacion: string,
+    request: GuardarFabricacionDetalleRequest,
+  ): Observable<FabricacionCompleta> {
+    return this.http.put<FabricacionCompleta>(
+      `${this.base}/api/fabricaciones/${idGranja}/${idFabricacion}/detalle`,
+      request,
+    );
+  }
+
+  eliminarFabricacion(idGranja: string, idFabricacion: string): Observable<void> {
+    return this.http.delete<void>(
+      `${this.base}/api/fabricaciones/${idGranja}/${idFabricacion}`,
     );
   }
 

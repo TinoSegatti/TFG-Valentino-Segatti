@@ -77,4 +77,14 @@ public class PlanService {
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
     }
+
+    /** RF-FAB-005: limite de fabricaciones activas por plan. */
+    public int limiteFabricaciones(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO -> 5;
+            case STARTER -> 50;
+            case BUSINESS -> 500;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
 }
