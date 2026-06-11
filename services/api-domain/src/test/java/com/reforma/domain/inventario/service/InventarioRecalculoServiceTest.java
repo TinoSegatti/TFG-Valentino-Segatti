@@ -116,7 +116,7 @@ class InventarioRecalculoServiceTest {
                 .thenReturn(Optional.empty());
         when(compraDetalleRepository.totalPorMateriaPrima(eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA)))
                 .thenReturn(new com.reforma.domain.compras.support.CompraTotalesMateriaPrima(150.0, 1600.0));
-        when(fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(ID_GRANJA, 10L)).thenReturn(500.0);
+        when(fabricacionDetalleRepository.sumCantidadUsadaPorMateriaPrima(ID_GRANJA, 10L)).thenReturn(50.0);
         when(inventarioRepository.findByGranjaIdAndMateriaPrimaId(ID_GRANJA, 10L))
                 .thenReturn(Optional.of(existente));
         when(inventarioRepository.save(any(Inventario.class))).thenAnswer(inv -> inv.getArgument(0));

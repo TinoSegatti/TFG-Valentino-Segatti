@@ -136,7 +136,12 @@ class ComprasIntegracionIT {
 
         var persistida = compraCabeceraRepository.findById(cabecera.id()).orElseThrow();
         assertThat(persistida.getEstado()).isEqualTo(EstadoCompra.REGISTRADA);
-        assertThat(persistida.getDetalles()).hasSize(2);
+        // Conteo de detalle persistido vía SQL (sin navegar la colección lazy fuera de sesión).
+        Integer detallesPersistidos = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM t_compra_detalle WHERE id_compra = ?",
+                Integer.class,
+                cabecera.id());
+        assertThat(detallesPersistidos).isEqualTo(2);
     }
 
     @Test
@@ -169,7 +174,7 @@ class ComprasIntegracionIT {
     }
 
     @Test
-    @DisplayName("guardarDetalle: rechaza suma fuera de tolerancia ±0,50")
+    @DisplayName("guardarDetalle: rechaza suma de subtotales que no cuadra con el total de factura")
     void guardarDetalle_sumaFueraDeTolerancia() {
         var cabecera = compraService.crearCabecera(
                 ID_USUARIO,
@@ -181,12 +186,14 @@ class ComprasIntegracionIT {
                         1_000.0,
                         null));
 
+        // Línea internamente coherente (9 × 100 = 900) para superar la validación por línea;
+        // lo que falla es la suma de subtotales (900) frente al total de factura (1000).
         assertThatThrownBy(() -> compraService.guardarDetalle(
                         ID_USUARIO,
                         ID_GRANJA,
                         cabecera.id(),
                         new GuardarCompraDetalleRequest(
-                                List.of(new CompraDetalleLineRequest(idMpMaiz, 10.0, 100.0, 999.0)))))
+                                List.of(new CompraDetalleLineRequest(idMpMaiz, 9.0, 100.0, 900.0)))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("suma de subtotales");
     }
@@ -225,15 +232,16 @@ class ComprasIntegracionIT {
                         idProveedor,
                         "F-PRECIO",
                         LocalDate.of(2026, 6, 1),
-                        1_000.0,
+                        1_200.0,
                         null));
 
+        // 10 kg × 120 $/kg = 1.200 (línea coherente y suma = total de factura).
         compraService.guardarDetalle(
                 ID_USUARIO,
                 ID_GRANJA,
                 cabecera.id(),
                 new GuardarCompraDetalleRequest(
-                        List.of(new CompraDetalleLineRequest(idMpMaiz, 10.0, 120.0, 1_000.0))));
+                        List.of(new CompraDetalleLineRequest(idMpMaiz, 10.0, 120.0, 1_200.0))));
 
         var maiz = materiaPrimaRepository.findById(idMpMaiz).orElseThrow();
         assertThat(maiz.getPrecioPorKilo()).isEqualTo(120.0);
@@ -266,15 +274,16 @@ class ComprasIntegracionIT {
                         idProveedor,
                         "F-ANTIGUA",
                         LocalDate.of(2026, 6, 1),
-                        500.0,
+                        250.0,
                         null));
 
+        // 5 kg × 50 $/kg = 250 (línea coherente y suma = total de factura).
         compraService.guardarDetalle(
                 ID_USUARIO,
                 ID_GRANJA,
                 cabeceraAntigua.id(),
                 new GuardarCompraDetalleRequest(
-                        List.of(new CompraDetalleLineRequest(idMpMaiz, 5.0, 50.0, 500.0))));
+                        List.of(new CompraDetalleLineRequest(idMpMaiz, 5.0, 50.0, 250.0))));
 
         var maizFinal = materiaPrimaRepository.findById(idMpMaiz).orElseThrow();
         assertThat(maizFinal.getPrecioPorKilo()).isEqualTo(200.0);
