@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, viewChild } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -6,16 +6,27 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { FormulaResumen, textoConfirmacionEliminarFormula } from '../../../data/models/formula.model';
+import { CsvImportResult, descargarBlobComoArchivo } from '../../../data/models/csv.model';
+import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
 
 @Component({
   selector: 'app-formulas',
   standalone: true,
-  imports: [RouterLink, DecimalPipe, FormsModule],
+  imports: [RouterLink, DecimalPipe, FormsModule, CatalogoCsvBarComponent],
   template: `
     <header class="toolbar">
       <h2>Formulas dietarias</h2>
       <a routerLink="nueva" class="btn-nueva">Crear formula</a>
     </header>
+
+    <app-catalogo-csv-bar
+      #csvBar
+      [trabajando]="csvTrabajando()"
+      [resultado]="csvResultado()"
+      columnasAyuda="codigo_formula, descripcion_formula, codigo_animal, codigo_materia_prima, cantidad_kg"
+      (exportar)="exportarCsv()"
+      (importar)="importarCsv($event)"
+    />
 
     @if (formulaEliminando()) {
       <section class="panel eliminar">
@@ -64,7 +75,7 @@ import { FormulaResumen, textoConfirmacionEliminarFormula } from '../../../data/
                 <td>{{ f.codigoFormula }}</td>
                 <td>{{ f.descripcionFormula }}</td>
                 <td>{{ f.descripcionAnimal }} ({{ f.codigoAnimal }})</td>
-                <td>$ {{ f.costoTotalFormula | number: '1.3-3' }}</td>
+                <td>$ {{ f.costoTotalFormula | number: '1.2-2' }}</td>
                 <td>
                   <span [class.incompleta]="!f.completa">{{
                     f.completa ? 'Completa' : 'Incompleta'
@@ -195,6 +206,10 @@ export class FormulasComponent implements OnInit {
   readonly formulaEliminando = signal<FormulaResumen | null>(null);
   readonly fraseEliminarEsperada = signal('');
 
+  readonly csvTrabajando = signal(false);
+  readonly csvResultado = signal<CsvImportResult | null>(null);
+  private readonly csvBar = viewChild(CatalogoCsvBarComponent);
+
   textoConfirmacionEliminar = '';
 
   private get idGranja(): string {
@@ -248,6 +263,38 @@ export class FormulasComponent implements OnInit {
       error: () => {
         this.error.set('No se pudieron cargar las formulas');
         this.cargando.set(false);
+      },
+    });
+  }
+
+  exportarCsv(): void {
+    this.csvTrabajando.set(true);
+    this.api.exportarFormulasCsv(this.idGranja).subscribe({
+      next: (blob) => {
+        descargarBlobComoArchivo(blob, `formulas-${this.idGranja}.csv`);
+        this.csvTrabajando.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.csvTrabajando.set(false);
+        this.error.set(mensajeErrorHttp(err, 'No se pudo exportar el CSV'));
+      },
+    });
+  }
+
+  importarCsv(archivo: File): void {
+    this.csvTrabajando.set(true);
+    this.csvResultado.set(null);
+    this.error.set(null);
+    this.api.importarFormulasCsv(this.idGranja, archivo).subscribe({
+      next: (resultado) => {
+        this.csvResultado.set(resultado);
+        this.csvTrabajando.set(false);
+        this.csvBar()?.reset();
+        if (resultado.filasOk > 0) this.recargar();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.csvTrabajando.set(false);
+        this.error.set(mensajeErrorHttp(err, 'No se pudo importar el CSV'));
       },
     });
   }

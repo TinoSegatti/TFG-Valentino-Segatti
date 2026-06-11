@@ -1,6 +1,6 @@
 export const PESO_LOTE_FORMULA_KG = 1000;
-export const DECIMALES_FORMULA = 3;
-export const TOLERANCIA_KG_FORMULA = 0.001;
+export const DECIMALES_FORMULA = 2;
+export const TOLERANCIA_KG_FORMULA = 0.01;
 
 export interface FormulaResumen {
   id: string;

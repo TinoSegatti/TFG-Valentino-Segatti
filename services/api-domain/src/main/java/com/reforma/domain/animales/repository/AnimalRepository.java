@@ -24,5 +24,12 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
      */
     boolean existsByGranjaIdAndCodigoAnimalIgnoreCaseAndActivoTrue(String idGranja, String codigo);
 
+    /**
+     * Busca un animal activo por su código de negocio dentro de la granja.
+     * Útil para flujos donde el CSV de import referencia animales por código (no por id).
+     */
+    Optional<Animal> findByGranjaIdAndCodigoAnimalIgnoreCaseAndActivoTrue(
+            String idGranja, String codigo);
+
     long countByGranjaIdAndActivoTrue(String idGranja);
 }
