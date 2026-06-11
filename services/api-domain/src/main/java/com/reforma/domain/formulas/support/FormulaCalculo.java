@@ -7,8 +7,10 @@ import java.math.RoundingMode;
 public final class FormulaCalculo {
 
     public static final double PESO_LOTE_KG = 1000.0;
-    public static final int DECIMALES = 3;
-    public static final double TOLERANCIA_KG = 0.001;
+    /** Cantidades, porcentajes y costos del detalle se redondean a 2 decimales. */
+    public static final int DECIMALES = 2;
+    /** Tolerancia de cierre del lote acorde a la precision de 2 decimales. */
+    public static final double TOLERANCIA_KG = 0.01;
 
     private FormulaCalculo() {}
 

@@ -4,12 +4,21 @@ import com.reforma.domain.animales.dto.AnimalRequest;
 import com.reforma.domain.animales.dto.AnimalResponse;
 import com.reforma.domain.animales.entity.Animal;
 import com.reforma.domain.animales.repository.AnimalRepository;
+import com.reforma.domain.common.csv.CsvFields;
+import com.reforma.domain.common.csv.CsvImportError;
+import com.reforma.domain.common.csv.CsvImportResult;
+import com.reforma.domain.common.csv.CsvReader;
+import com.reforma.domain.common.csv.CsvWriter;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.granjas.service.GranjaAccesoService;
 import com.reforma.domain.suscripciones.service.PlanService;
+import java.io.InputStream;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -114,6 +123,78 @@ public class AnimalService {
         animal.setActivo(false);
         animal.setFechaUltimaActualizacion(Instant.now());
         // Sin delete() — RF-ANI-002 (fórmulas/fabricaciones que lo referencian deben seguir leyendo).
+    }
+
+    /**
+     * Exporta animales activos a CSV (RF-ANI-003).
+     * <p>Columnas: {@code codigo, descripcion, categoria, observaciones}.
+     */
+    @Transactional(readOnly = true)
+    public String exportarCsv(String idUsuario, String idGranja) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        List<List<String>> filas = new ArrayList<>();
+        filas.add(Arrays.asList("codigo", "descripcion", "categoria", "observaciones"));
+        animalRepository
+                .findByGranjaIdAndActivoTrueOrderByDescripcionAnimalAsc(idGranja)
+                .forEach(a -> filas.add(Arrays.asList(
+                        textoONulo(a.getCodigoAnimal()),
+                        textoONulo(a.getDescripcionAnimal()),
+                        textoONulo(a.getCategoriaAnimal()),
+                        textoONulo(a.getObservaciones()))));
+        return CsvWriter.escribir(filas);
+    }
+
+    /**
+     * Importa animales desde un CSV. Header esperado: {@code codigo, descripcion} (obligatorias)
+     * y opcionales {@code categoria, observaciones} (RF-ANI-003).
+     */
+    @Transactional
+    public CsvImportResult importarCsv(String idUsuario, String idGranja, InputStream csv) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        List<Map<String, String>> filas = CsvReader.leer(csv);
+        if (filas.isEmpty()) return CsvImportResult.vacio();
+
+        Granja granja = granjaRepository.findById(idGranja).orElseThrow();
+        int filasOk = 0;
+        List<CsvImportError> errores = new ArrayList<>();
+        Instant ahora = Instant.now();
+        int numeroLinea = 1;
+        for (Map<String, String> fila : filas) {
+            numeroLinea++;
+            String codigo = null;
+            try {
+                CsvFields.validarColumnas(fila, "codigo", "descripcion");
+                codigo = CsvFields.requerido(fila, "codigo");
+                String descripcion = CsvFields.requerido(fila, "descripcion");
+                validarLimitePlan(idUsuario, idGranja);
+                if (animalRepository.existsByGranjaIdAndCodigoAnimalIgnoreCaseAndActivoTrue(
+                        idGranja, codigo)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT, "Ya existe un animal activo con código " + codigo);
+                }
+                Animal a = Animal.builder()
+                        .granja(granja)
+                        .codigoAnimal(codigo)
+                        .descripcionAnimal(descripcion)
+                        .categoriaAnimal(CsvFields.opcional(fila, "categoria"))
+                        .observaciones(CsvFields.opcional(fila, "observaciones"))
+                        .activo(true)
+                        .fechaCreacion(ahora)
+                        .fechaUltimaActualizacion(ahora)
+                        .build();
+                animalRepository.save(a);
+                filasOk++;
+            } catch (ResponseStatusException e) {
+                errores.add(new CsvImportError(numeroLinea, codigo, e.getReason()));
+            } catch (RuntimeException e) {
+                errores.add(new CsvImportError(numeroLinea, codigo, "Error: " + e.getMessage()));
+            }
+        }
+        return new CsvImportResult(filasOk, errores.size(), errores);
+    }
+
+    private static String textoONulo(String v) {
+        return v == null ? "" : v;
     }
 
     private Animal obtenerOFallar(Long idAnimal, String idGranja) {

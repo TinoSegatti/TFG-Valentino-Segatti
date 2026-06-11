@@ -1,5 +1,10 @@
 package com.reforma.domain.proveedores.service;
 
+import com.reforma.domain.common.csv.CsvFields;
+import com.reforma.domain.common.csv.CsvImportError;
+import com.reforma.domain.common.csv.CsvImportResult;
+import com.reforma.domain.common.csv.CsvReader;
+import com.reforma.domain.common.csv.CsvWriter;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
 import com.reforma.domain.granjas.service.GranjaAccesoService;
@@ -8,8 +13,12 @@ import com.reforma.domain.proveedores.dto.ProveedorResponse;
 import com.reforma.domain.proveedores.entity.Proveedor;
 import com.reforma.domain.proveedores.repository.ProveedorRepository;
 import com.reforma.domain.suscripciones.service.PlanService;
+import java.io.InputStream;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -124,6 +133,89 @@ public class ProveedorService {
         proveedor.setActivo(false);
         proveedor.setFechaUltimaActualizacion(Instant.now());
         // Sin delete() — RF-PROV-002 exige conservar el historial.
+    }
+
+    /**
+     * Exporta proveedores activos de la granja a CSV (alineado a RF-MP-004 para todo el catálogo).
+     * <p>Columnas: {@code codigo, nombre, telefono, email, cuit, direccion, localidad, notas}.
+     */
+    @Transactional(readOnly = true)
+    public String exportarCsv(String idUsuario, String idGranja) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        List<List<String>> filas = new ArrayList<>();
+        filas.add(Arrays.asList(
+                "codigo", "nombre", "telefono", "email", "cuit", "direccion", "localidad", "notas"));
+        proveedorRepository
+                .findByGranjaIdAndActivoTrueOrderByNombreProveedorAsc(idGranja)
+                .forEach(p -> filas.add(Arrays.asList(
+                        textoONulo(p.getCodigoProveedor()),
+                        textoONulo(p.getNombreProveedor()),
+                        textoONulo(p.getTelefono()),
+                        textoONulo(p.getEmail()),
+                        textoONulo(p.getCuit()),
+                        textoONulo(p.getDireccion()),
+                        textoONulo(p.getLocalidad()),
+                        textoONulo(p.getNotas()))));
+        return CsvWriter.escribir(filas);
+    }
+
+    /**
+     * Importa proveedores desde un CSV. Header esperado: {@code codigo, nombre} (obligatorias)
+     * y opcionales {@code telefono, email, cuit, direccion, localidad, notas}.
+     * <p>Cada fila se procesa individualmente; los errores no abortan el resto.
+     */
+    @Transactional
+    public CsvImportResult importarCsv(String idUsuario, String idGranja, InputStream csv) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        List<Map<String, String>> filas = CsvReader.leer(csv);
+        if (filas.isEmpty()) return CsvImportResult.vacio();
+
+        Granja granja = granjaRepository.findById(idGranja).orElseThrow();
+        int filasOk = 0;
+        List<CsvImportError> errores = new ArrayList<>();
+        Instant ahora = Instant.now();
+        int numeroLinea = 1;
+        for (Map<String, String> fila : filas) {
+            numeroLinea++;
+            String codigo = null;
+            try {
+                CsvFields.validarColumnas(fila, "codigo", "nombre");
+                codigo = CsvFields.requerido(fila, "codigo");
+                String nombre = CsvFields.requerido(fila, "nombre");
+                validarLimitePlan(idUsuario, idGranja);
+                if (proveedorRepository
+                        .existsByGranjaIdAndCodigoProveedorIgnoreCaseAndActivoTrue(idGranja, codigo)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "Ya existe un proveedor activo con código " + codigo);
+                }
+                Proveedor p = Proveedor.builder()
+                        .granja(granja)
+                        .codigoProveedor(codigo)
+                        .nombreProveedor(nombre)
+                        .telefono(CsvFields.opcional(fila, "telefono"))
+                        .email(CsvFields.opcional(fila, "email"))
+                        .cuit(CsvFields.opcional(fila, "cuit"))
+                        .direccion(CsvFields.opcional(fila, "direccion"))
+                        .localidad(CsvFields.opcional(fila, "localidad"))
+                        .notas(CsvFields.opcional(fila, "notas"))
+                        .activo(true)
+                        .fechaCreacion(ahora)
+                        .fechaUltimaActualizacion(ahora)
+                        .build();
+                proveedorRepository.save(p);
+                filasOk++;
+            } catch (ResponseStatusException e) {
+                errores.add(new CsvImportError(numeroLinea, codigo, e.getReason()));
+            } catch (RuntimeException e) {
+                errores.add(new CsvImportError(numeroLinea, codigo, "Error: " + e.getMessage()));
+            }
+        }
+        return new CsvImportResult(filasOk, errores.size(), errores);
+    }
+
+    private static String textoONulo(String v) {
+        return v == null ? "" : v;
     }
 
     private Proveedor obtenerOFallar(Long idProveedor, String idGranja) {

@@ -1,10 +1,12 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime, Subject } from 'rxjs';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { Animal, AnimalRequest } from '../../../data/models/animal.model';
+import { CsvImportResult, descargarBlobComoArchivo } from '../../../data/models/csv.model';
+import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
 
 /**
  * Listado, alta rápida y baja lógica del catálogo de Animales (RF-ANI-001 / RF-ANI-002).
@@ -13,9 +15,18 @@ import { Animal, AnimalRequest } from '../../../data/models/animal.model';
 @Component({
   selector: 'app-animales',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, CatalogoCsvBarComponent],
   template: `
     <h2>Animales</h2>
+
+    <app-catalogo-csv-bar
+      #csvBar
+      [trabajando]="csvTrabajando()"
+      [resultado]="csvResultado()"
+      columnasAyuda="codigo, descripcion, categoria, observaciones"
+      (exportar)="exportarCsv()"
+      (importar)="importarCsv($event)"
+    />
 
     <section class="alta">
       <h3>Alta rápida</h3>
@@ -206,6 +217,10 @@ export class AnimalesComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly filtro = signal<string>('');
 
+  readonly csvTrabajando = signal(false);
+  readonly csvResultado = signal<CsvImportResult | null>(null);
+  private readonly csvBar = viewChild(CatalogoCsvBarComponent);
+
   // Debounce 300ms para no martillar al backend con cada tecla del filtro.
   private readonly busquedaPendiente = new Subject<string>();
 
@@ -269,6 +284,37 @@ export class AnimalesComponent implements OnInit {
     this.api.desactivarAnimal(this.idGranja, a.id).subscribe({
       next: () => this.items.update((prev) => prev.filter((x) => x.id !== a.id)),
       error: () => this.error.set('No se pudo dar de baja'),
+    });
+  }
+
+  exportarCsv(): void {
+    this.csvTrabajando.set(true);
+    this.api.exportarAnimalesCsv(this.idGranja).subscribe({
+      next: (blob) => {
+        descargarBlobComoArchivo(blob, `animales-${this.idGranja}.csv`);
+        this.csvTrabajando.set(false);
+      },
+      error: () => {
+        this.error.set('No se pudo exportar el CSV');
+        this.csvTrabajando.set(false);
+      },
+    });
+  }
+
+  importarCsv(archivo: File): void {
+    this.csvTrabajando.set(true);
+    this.csvResultado.set(null);
+    this.api.importarAnimalesCsv(this.idGranja, archivo).subscribe({
+      next: (resultado) => {
+        this.csvResultado.set(resultado);
+        this.csvTrabajando.set(false);
+        this.csvBar()?.reset();
+        if (resultado.filasOk > 0) this.recargar();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.csvTrabajando.set(false);
+        this.error.set(err.error?.message ?? 'No se pudo importar el CSV');
+      },
     });
   }
 }

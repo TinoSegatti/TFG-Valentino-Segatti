@@ -31,6 +31,7 @@ import {
   FabricacionResumen,
   GuardarFabricacionDetalleRequest,
 } from '../models/fabricacion.model';
+import { CsvImportResult } from '../models/csv.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -81,6 +82,21 @@ export class ReformaApiService {
     );
   }
 
+  exportarMateriasPrimasCsv(idGranja: string): Observable<Blob> {
+    return this.http.get(`${this.base}/api/materias-primas/${idGranja}/csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  importarMateriasPrimasCsv(idGranja: string, archivo: File): Observable<CsvImportResult> {
+    const formData = new FormData();
+    formData.append('archivo', archivo, archivo.name);
+    return this.http.post<CsvImportResult>(
+      `${this.base}/api/materias-primas/${idGranja}/csv`,
+      formData,
+    );
+  }
+
   // === Proveedores ===
   getProveedores(idGranja: string, buscar?: string): Observable<Proveedor[]> {
     const params = buscar ? new HttpParams().set('buscar', buscar) : undefined;
@@ -109,6 +125,21 @@ export class ReformaApiService {
     return this.http.delete<void>(`${this.base}/api/proveedores/${idGranja}/${idProveedor}`);
   }
 
+  exportarProveedoresCsv(idGranja: string): Observable<Blob> {
+    return this.http.get(`${this.base}/api/proveedores/${idGranja}/csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  importarProveedoresCsv(idGranja: string, archivo: File): Observable<CsvImportResult> {
+    const formData = new FormData();
+    formData.append('archivo', archivo, archivo.name);
+    return this.http.post<CsvImportResult>(
+      `${this.base}/api/proveedores/${idGranja}/csv`,
+      formData,
+    );
+  }
+
   // === Animales ===
   getAnimales(idGranja: string, buscar?: string): Observable<Animal[]> {
     const params = buscar ? new HttpParams().set('buscar', buscar) : undefined;
@@ -135,6 +166,21 @@ export class ReformaApiService {
 
   desactivarAnimal(idGranja: string, idAnimal: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/animales/${idGranja}/${idAnimal}`);
+  }
+
+  exportarAnimalesCsv(idGranja: string): Observable<Blob> {
+    return this.http.get(`${this.base}/api/animales/${idGranja}/csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  importarAnimalesCsv(idGranja: string, archivo: File): Observable<CsvImportResult> {
+    const formData = new FormData();
+    formData.append('archivo', archivo, archivo.name);
+    return this.http.post<CsvImportResult>(
+      `${this.base}/api/animales/${idGranja}/csv`,
+      formData,
+    );
   }
 
   // === Compras ===
@@ -218,6 +264,21 @@ export class ReformaApiService {
 
   desactivarFormula(idGranja: string, idFormula: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/formulas/${idGranja}/${idFormula}`);
+  }
+
+  exportarFormulasCsv(idGranja: string): Observable<Blob> {
+    return this.http.get(`${this.base}/api/formulas/${idGranja}/csv`, {
+      responseType: 'blob',
+    });
+  }
+
+  importarFormulasCsv(idGranja: string, archivo: File): Observable<CsvImportResult> {
+    const formData = new FormData();
+    formData.append('archivo', archivo, archivo.name);
+    return this.http.post<CsvImportResult>(
+      `${this.base}/api/formulas/${idGranja}/csv`,
+      formData,
+    );
   }
 
   // === Inventario ===

@@ -83,7 +83,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             </div>
             <div>
               <dt>Costo de fabricacion</dt>
-              <dd>$ {{ formula()!.costoTotalFormula | number: '1.3-3' }}</dd>
+              <dd>$ {{ formula()!.costoTotalFormula | number: '1.2-2' }}</dd>
             </div>
           </dl>
         } @else {
@@ -171,9 +171,9 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
                   <tr>
                     <td>{{ linea.codigo }}</td>
                     <td>{{ linea.nombre }}</td>
-                    <td>{{ linea.cantidadKg | number: '1.3-3' }}</td>
-                    <td>$ {{ linea.precioPorKilo | number: '1.3-3' }}</td>
-                    <td>$ {{ linea.costoParcial | number: '1.3-3' }}</td>
+                    <td>{{ linea.cantidadKg | number: '1.2-2' }}</td>
+                    <td>$ {{ linea.precioPorKilo | number: '1.2-2' }}</td>
+                    <td>$ {{ linea.costoParcial | number: '1.2-2' }}</td>
                   </tr>
                 }
               </tbody>
@@ -186,18 +186,18 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <p>
               Suma kg:
               <strong [class.ok]="loteCompleto()" [class.bad]="!loteCompleto()">
-                {{ sumaKg() | number: '1.3-3' }}
+                {{ sumaKg() | number: '1.2-2' }}
               </strong>
               / {{ PESO_LOTE }} kg
             </p>
             @if (!loteCompleto() && lineasConMateria().length) {
               <p class="warn">
-                Faltan {{ kilosFaltantesUi() | number: '1.3-3' }} kg para completar la formula.
+                Faltan {{ kilosFaltantesUi() | number: '1.2-2' }} kg para completar la formula.
               </p>
             }
             <p>
               Costo total estimado:
-              <strong>$ {{ costoTotalUi() | number: '1.3-3' }}</strong>
+              <strong>$ {{ costoTotalUi() | number: '1.2-2' }}</strong>
             </p>
           </footer>
         } @else {
@@ -238,7 +238,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
                 Cantidad (kg)
                 <input
                   type="number"
-                  step="0.001"
+                  step="0.01"
                   [(ngModel)]="linea.cantidadKg"
                   (ngModelChange)="onCantidadChange(i, $event)"
                 />
@@ -263,13 +263,13 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <p>
               Suma kg:
               <strong [class.ok]="loteCompleto()" [class.bad]="!loteCompleto()">
-                {{ sumaKg() | number: '1.3-3' }}
+                {{ sumaKg() | number: '1.2-2' }}
               </strong>
               / {{ PESO_LOTE }} kg
             </p>
             @if (!loteCompleto() && lineasConMateria().length) {
               <p class="warn">
-                Faltan {{ kilosFaltantesUi() | number: '1.3-3' }} kg para completar la formula.
+                Faltan {{ kilosFaltantesUi() | number: '1.2-2' }} kg para completar la formula.
               </p>
             }
             @if (loteCompleto()) {
@@ -277,7 +277,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             }
             <p>
               Costo total estimado:
-              <strong>$ {{ costoTotalUi() | number: '1.3-3' }}</strong>
+              <strong>$ {{ costoTotalUi() | number: '1.2-2' }}</strong>
             </p>
             @if (conflictoDetalle()) {
               <p class="conflicto">{{ conflictoDetalle() }}</p>

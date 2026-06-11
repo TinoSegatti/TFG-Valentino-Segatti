@@ -1,10 +1,12 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime, Subject } from 'rxjs';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { Proveedor, ProveedorRequest } from '../../../data/models/proveedor.model';
+import { CsvImportResult, descargarBlobComoArchivo } from '../../../data/models/csv.model';
+import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
 
 /**
  * Listado, alta rápida y baja lógica de proveedores (RF-PROV-001 / RF-PROV-002).
@@ -13,9 +15,18 @@ import { Proveedor, ProveedorRequest } from '../../../data/models/proveedor.mode
 @Component({
   selector: 'app-proveedores',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, CatalogoCsvBarComponent],
   template: `
     <h2>Proveedores</h2>
+
+    <app-catalogo-csv-bar
+      #csvBar
+      [trabajando]="csvTrabajando()"
+      [resultado]="csvResultado()"
+      columnasAyuda="codigo, nombre, telefono, email, cuit, direccion, localidad, notas"
+      (exportar)="exportarCsv()"
+      (importar)="importarCsv($event)"
+    />
 
     <section class="alta">
       <h3>Alta rápida</h3>
@@ -194,6 +205,10 @@ export class ProveedoresComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly filtro = signal<string>('');
 
+  readonly csvTrabajando = signal(false);
+  readonly csvResultado = signal<CsvImportResult | null>(null);
+  private readonly csvBar = viewChild(CatalogoCsvBarComponent);
+
   /**
    * Debounce de 300ms sobre el filtro de búsqueda para no martillar al backend con cada tecla.
    * Cada cambio en el input alimenta este Subject; el operador `debounceTime` espera la pausa
@@ -264,6 +279,37 @@ export class ProveedoresComponent implements OnInit {
     this.api.desactivarProveedor(this.idGranja, p.id).subscribe({
       next: () => this.items.update((prev) => prev.filter((x) => x.id !== p.id)),
       error: () => this.error.set('No se pudo dar de baja'),
+    });
+  }
+
+  exportarCsv(): void {
+    this.csvTrabajando.set(true);
+    this.api.exportarProveedoresCsv(this.idGranja).subscribe({
+      next: (blob) => {
+        descargarBlobComoArchivo(blob, `proveedores-${this.idGranja}.csv`);
+        this.csvTrabajando.set(false);
+      },
+      error: () => {
+        this.error.set('No se pudo exportar el CSV');
+        this.csvTrabajando.set(false);
+      },
+    });
+  }
+
+  importarCsv(archivo: File): void {
+    this.csvTrabajando.set(true);
+    this.csvResultado.set(null);
+    this.api.importarProveedoresCsv(this.idGranja, archivo).subscribe({
+      next: (resultado) => {
+        this.csvResultado.set(resultado);
+        this.csvTrabajando.set(false);
+        this.csvBar()?.reset();
+        if (resultado.filasOk > 0) this.recargar();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.csvTrabajando.set(false);
+        this.error.set(err.error?.message ?? 'No se pudo importar el CSV');
+      },
     });
   }
 }
