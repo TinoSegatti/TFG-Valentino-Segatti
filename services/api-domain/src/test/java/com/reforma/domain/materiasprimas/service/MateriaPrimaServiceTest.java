@@ -295,6 +295,58 @@ class MateriaPrimaServiceTest {
         verify(materiaPrimaRepository).findByGranjaIdAndActivaTrueOrderByNombreMateriaPrimaAsc(ID_GRANJA);
     }
 
+    // ---------- exportar / importar CSV (RF-MP-004) ----------
+
+    @Test
+    @DisplayName("exportarCsv: serializa header + filas activas en orden alfabético")
+    void exportarCsv_serializaFilas() {
+        when(materiaPrimaRepository.findByGranjaIdAndActivaTrueOrderByNombreMateriaPrimaAsc(ID_GRANJA))
+                .thenReturn(java.util.List.of(
+                        materiaPrimaExistente("MAIZ", "Maíz molido", 35.5),
+                        materiaPrimaExistente("SOJA", "Soja", 40.0)));
+
+        String csv = materiaPrimaService.exportarCsv(ID_USUARIO, ID_GRANJA);
+
+        assertThat(csv).startsWith("codigo,nombre,precio_por_kilo\r\n");
+        assertThat(csv).contains("MAIZ,Maíz molido,35.5\r\n");
+        assertThat(csv).contains("SOJA,Soja,40.0\r\n");
+        verify(granjaAccesoService).validarAcceso(ID_USUARIO, ID_GRANJA);
+    }
+
+    @Test
+    @DisplayName("importarCsv: filas válidas se persisten, las inválidas se reportan sin abortar")
+    void importarCsv_mezcla() {
+        configurarPlanBusinessSinUsoActual();
+        when(granjaRepository.findById(ID_GRANJA)).thenReturn(Optional.of(granjaDemo));
+        when(materiaPrimaRepository
+                        .existsByGranjaIdAndCodigoMateriaPrimaIgnoreCaseAndActivaTrue(
+                                eq(ID_GRANJA), anyString()))
+                .thenAnswer(inv -> "DUP".equalsIgnoreCase(inv.getArgument(1, String.class)));
+        when(materiaPrimaRepository.save(any(MateriaPrima.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        String csv =
+                "codigo,nombre,precio_por_kilo\n"
+                        + "MAIZ,Maíz molido,35.5\n"
+                        + ",Falta código,10\n"
+                        + "DUP,Duplicado activo,20\n"
+                        + "SOJA,Soja,40\n";
+
+        com.reforma.domain.common.csv.CsvImportResult resultado =
+                materiaPrimaService.importarCsv(
+                        ID_USUARIO,
+                        ID_GRANJA,
+                        new java.io.ByteArrayInputStream(
+                                csv.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertThat(resultado.filasOk()).isEqualTo(2);
+        assertThat(resultado.filasError()).isEqualTo(2);
+        assertThat(resultado.errores()).extracting("linea").containsExactly(3, 4);
+        assertThat(resultado.errores().get(0).mensaje()).contains("codigo");
+        assertThat(resultado.errores().get(1).mensaje()).contains("DUP");
+        verify(materiaPrimaRepository, times(2)).save(any(MateriaPrima.class));
+    }
+
     // ---------- helpers ----------
 
     /**
