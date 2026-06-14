@@ -1,5 +1,8 @@
 package com.reforma.domain.usuarios.service;
 
+import com.reforma.domain.auditoria.domain.AccionAuditoria;
+import com.reforma.domain.auditoria.dto.AuditoriaEvento;
+import com.reforma.domain.auditoria.service.AuditoriaService;
 import com.reforma.domain.auth.jwt.TokenJwtServicio;
 import com.reforma.domain.common.domain.PlanSuscripcion;
 import com.reforma.domain.common.domain.TipoUsuario;
@@ -24,9 +27,12 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class CredencialesUsuarioService {
 
+    private static final String TABLA_USUARIOS = "t_usuarios";
+
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenJwtServicio tokenJwtServicio;
+    private final AuditoriaService auditoriaService;
 
     @Transactional
     public Map<String, Object> registrarUsuario(RegistroRequest request) {
@@ -50,8 +56,20 @@ public class CredencialesUsuarioService {
                 .esUsuarioEmpleado(false)
                 .activoComoEmpleado(false)
                 .build();
-        usuarioRepository.save(usuario);
-        // TODO: EmailNotificacionService — enviar verificación (RF-AUTH-001)
+        // saveAndFlush: la fila debe existir en la transacción antes de auditar (FK id_usuario).
+        usuarioRepository.saveAndFlush(usuario);
+        auditoriaService.registrar(AuditoriaEvento.builder()
+                .idUsuario(usuario.getId())
+                .tablaOrigen(TABLA_USUARIOS)
+                .idRegistro(usuario.getId())
+                .accion(AccionAuditoria.REGISTRO)
+                .descripcion("Registro de usuario dueño")
+                .datosNuevos(Map.of(
+                        "email", usuario.getEmail(),
+                        "tipoUsuario", usuario.getTipoUsuario().name(),
+                        "planSuscripcion", usuario.getPlanSuscripcion().name()))
+                .build());
+        // TODO: EmailNotificacionService — enviar verificación (RF-AUTH-001, Etapa 1)
         return Map.of(
                 "usuario", UsuarioResponse.from(usuario),
                 "requiereVerificacion", true,
@@ -59,24 +77,49 @@ public class CredencialesUsuarioService {
                 "esEmpleado", false);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse iniciarSesion(LoginRequest request) {
         var usuario = usuarioRepository
                 .findByEmailIgnoreCase(request.email())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
         if (usuario.getPasswordHash() == null
                 || !passwordEncoder.matches(request.password(), usuario.getPasswordHash())) {
+            auditarFalloLogin(usuario, "Contraseña inválida");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
         if (!Boolean.TRUE.equals(usuario.getActivo())) {
+            auditarFalloLogin(usuario, "Cuenta desactivada");
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta desactivada");
         }
         if (!Boolean.TRUE.equals(usuario.getEmailVerificado())) {
+            auditarFalloLogin(usuario, "Email no verificado");
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN, "Debe verificar su email antes de acceder");
         }
         usuario.setUltimoAcceso(Instant.now());
         var token = tokenJwtServicio.generarToken(usuario);
+        auditoriaService.registrar(AuditoriaEvento.builder()
+                .idUsuario(usuario.getId())
+                .tablaOrigen(TABLA_USUARIOS)
+                .idRegistro(usuario.getId())
+                .accion(AccionAuditoria.LOGIN)
+                .descripcion("Inicio de sesión")
+                .build());
         return new AuthResponse(UsuarioResponse.from(usuario), token);
+    }
+
+    /**
+     * Audita un intento de login fallido de un usuario existente. Usa una transacción nueva
+     * ({@code REQUIRES_NEW}) porque a continuación se relanza la excepción y la transacción
+     * de login hace rollback; la fila de auditoría debe sobrevivir.
+     */
+    private void auditarFalloLogin(Usuario usuario, String motivo) {
+        auditoriaService.registrarIndependiente(AuditoriaEvento.builder()
+                .idUsuario(usuario.getId())
+                .tablaOrigen(TABLA_USUARIOS)
+                .idRegistro(usuario.getId())
+                .accion(AccionAuditoria.LOGIN_FALLIDO)
+                .descripcion(motivo)
+                .build());
     }
 }

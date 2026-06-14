@@ -17,6 +17,44 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-14 — Módulo Usuarios · Etapa 0: infraestructura de auditoría
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** primera etapa del módulo de usuarios (`docs/MODULO_USUARIOS.md`). Se implementó la
+  pista de auditoría sobre la tabla `t_auditoria` (ya existente en V001, antes sin uso):
+  - Nuevo paquete `auditoria`: `domain/AccionAuditoria` (enum, acciones de Etapas 0–4),
+    `entity/Auditoria` (mapea `t_auditoria`, JSONB vía `@JdbcTypeCode(SqlTypes.JSON)`),
+    `repository/AuditoriaRepository`, `dto/AuditoriaEvento` (builder) y `service/AuditoriaService`.
+  - `AuditoriaService` captura IP (`X-Forwarded-For`→`remoteAddr`) y User-Agent del request
+    (best-effort, nulos fuera de contexto web) y serializa datos a JSON sin romper la operación
+    de negocio. Dos semánticas: `registrar` (REQUIRED, se une a la tx del alta) y
+    `registrarIndependiente` (REQUIRES_NEW, para eventos en flujos que hacen rollback, p. ej. login fallido).
+  - Cableado en `CredencialesUsuarioService`: `REGISTRO` (tras `saveAndFlush` para satisfacer la
+    FK `id_usuario`), `LOGIN` (login ahora es `@Transactional` read-write: además persiste
+    `ultimoAcceso`, antes silenciosamente descartado por `readOnly`), y `LOGIN_FALLIDO` para
+    contraseña inválida / cuenta desactivada / email no verificado (no se audita email inexistente
+    porque no hay usuario referenciable por la FK).
+- **Tests:** `AuditoriaServiceTest` (2) y `CredencialesUsuarioServiceTest` (6, nuevo). Suite
+  unitaria completa **138/138 verde** (antes 130). Corridos vía `maven:3.9-eclipse-temurin-21-alpine`
+  (no hay `mvn` local; patrón de `scripts/test-domain.ps1`).
+- **Archivos principales:** `services/api-domain/src/main/java/com/reforma/domain/auditoria/**`,
+  `usuarios/service/CredencialesUsuarioService.java`; tests en `auditoria/service/` y `usuarios/service/`.
+- **Pendiente (resto de Etapa 0, ver `MODULO_USUARIOS.md §4`):** hash de tokens, respuestas
+  anti-enumeración, `jti`/revocación en Redis y rate-limiting/lockout — se abordan junto a sus
+  flujos consumidores en Etapa 1. La auditoría por `@Aspect` se difiere: hoy se invoca explícito
+  desde el servicio de usuarios. **Sigue:** Etapa 1 (verificación de email + recuperación de contraseña).
+
+### 2026-06-14 — Plan y traspaso del módulo Gestión de Usuarios
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** lectura del estado actual de auth/usuarios y **propuesta por etapas (0–5)** para el
+  módulo completo: verificación de email, recuperación de contraseña, invitación de empleados,
+  cuentas jefe, autorización por rol y consola de auditoría. **Sin implementación todavía.**
+  Decisiones tomadas con el usuario: onboarding de empleados **por invitación email** y
+  **cuentas separadas** (un email es dueño O empleado, nunca ambos).
+- **Archivos principales:** nuevo [`docs/MODULO_USUARIOS.md`](MODULO_USUARIOS.md) (plan completo,
+  archivos a leer, sketch de `V010 t_token_seguridad`, próximo paso). Sin cambios de código.
+- **Pendiente:** implementar Etapa 0 + 1 (auditoría base + verificación de email, que hoy bloquea
+  todo login real fuera del seed). Ver `MODULO_USUARIOS.md §6`.
+
 ### 2026-06-11 — Tests de integración del import/export CSV (catálogos + fórmulas)
 - **Autor/agente:** Claude Code (Opus 4.8)
 - **Qué:**
