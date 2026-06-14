@@ -58,3 +58,8 @@ ehthumbs.db
 # --- Archivos temporales del repo ---
 *.tmp
 *.bak
+
+
+# Archivos temporales de testing manual de APIs
+tmp-*.json
+*.tmp.json
