@@ -17,6 +17,37 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-14 — Módulo Usuarios · Etapa 1: verificación de email + recuperación de contraseña
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** ciclo de vida del dueño completo (registro → verificación → recuperación), backend + frontend.
+  - **BD:** `V010__token_seguridad.sql` → `t_token_seguridad` (token de un solo uso; se guarda solo
+    el hash SHA-256; expiración + `consumido_en`).
+  - **Tokens:** paquete `usuarios/token` (`TipoToken`, `TokenSeguridad`, repo con `invalidarVigentes`,
+    `TokenSeguridadService.emitir/validarYConsumir`) + `common/util/TokenHasher` (token aleatorio 256-bit + SHA-256 hex).
+  - **Email:** `EmailNotificacionService` (interfaz) + `LogEmailNotificacionService` (default,
+    escribe el enlace en el log con `reforma.frontendUrl`). SMTP real queda pendiente (activable con `reforma.email.mode=smtp`).
+  - **Servicios/endpoints:** registro ahora emite token + envía email de verificación
+    (`emailEnviado=true`, se quitó el `token_verificacion` en claro de la entidad). Nuevo
+    `RecuperacionCuentaService` + endpoints `POST /api/usuarios/{verificar-email, reenviar-verificacion,
+    solicitar-reset, confirmar-reset}` (los dos de reset agregados a `PUBLIC`). `reenviar`/`solicitar`
+    devuelven respuesta genérica (anti-enumeración); `confirmar-reset` además verifica el email.
+    Auditoría: VERIFICACION_EMAIL / REENVIO_VERIFICACION / SOLICITUD_RESET / RESET_PASSWORD.
+  - **Frontend:** `features/auth/` → `registro`, `verificar-email` (deep link), `reenviar-verificacion`,
+    `olvide-password`, `restablecer`; login con enlaces y aviso `?reset=ok`. Rutas + métodos de API.
+- **Tests:** `TokenHasherTest`, `TokenSeguridadServiceTest`, `RecuperacionCuentaServiceTest` +
+  `CredencialesUsuarioServiceTest` actualizado. Suite unitaria **152/152 verde** (antes 138).
+- **Verificación en vivo:** rebuild de `api-domain` (Flyway aplicó V010, Hibernate validate OK) y
+  smoke end-to-end por HTTP: registro → login bloqueado (403) → verificación → login OK → solicitar
+  reset → confirmar reset → login con nueva clave OK; clave vieja 401; reuso de token 400; tokens
+  marcados consumidos. Web reconstruida (Angular build OK) y deep link `/auth/verificar-email` sirve la SPA (200).
+- **Archivos principales:** `db/migration/V010__token_seguridad.sql`, `usuarios/token/**`,
+  `usuarios/email/**`, `usuarios/service/RecuperacionCuentaService.java`, `usuarios/dto/*Reset*|*Verif*`,
+  `usuarios/controller/UsuarioAuthRestController.java`, `config/SecurityConfig.java`,
+  `common/util/TokenHasher.java`; frontend `apps/web/src/app/features/auth/**`, `app.routes.ts`,
+  `data/api/reforma-api.service.ts`.
+- **Pendiente:** envío SMTP real; endurecimiento Etapa 0 (rate-limit/lockout + `jti`/revocación Redis);
+  `X-Forwarded-For` en nginx para IP de auditoría real. **Sigue:** Etapa 2+3 (invitación y cuentas empleado).
+
 ### 2026-06-14 — Módulo Usuarios · Etapa 0: infraestructura de auditoría
 - **Autor/agente:** Claude Code (Opus 4.8)
 - **Qué:** primera etapa del módulo de usuarios (`docs/MODULO_USUARIOS.md`). Se implementó la
