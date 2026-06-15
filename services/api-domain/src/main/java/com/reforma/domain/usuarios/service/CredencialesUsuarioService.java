@@ -11,11 +11,14 @@ import com.reforma.domain.usuarios.dto.AuthResponse;
 import com.reforma.domain.usuarios.dto.LoginRequest;
 import com.reforma.domain.usuarios.dto.RegistroRequest;
 import com.reforma.domain.usuarios.dto.UsuarioResponse;
+import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
+import com.reforma.domain.usuarios.token.domain.TipoToken;
+import com.reforma.domain.usuarios.token.service.TokenSeguridadService;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,10 +32,14 @@ public class CredencialesUsuarioService {
 
     private static final String TABLA_USUARIOS = "t_usuarios";
 
+    private static final Duration VIGENCIA_VERIFICACION = Duration.ofHours(24);
+
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenJwtServicio tokenJwtServicio;
     private final AuditoriaService auditoriaService;
+    private final TokenSeguridadService tokenSeguridadService;
+    private final EmailNotificacionService emailNotificacionService;
 
     @Transactional
     public Map<String, Object> registrarUsuario(RegistroRequest request) {
@@ -50,13 +57,11 @@ public class CredencialesUsuarioService {
                 .maxGranjas(1)
                 .activo(true)
                 .emailVerificado(false)
-                .tokenVerificacion(UUID.randomUUID().toString().replace("-", ""))
-                .fechaExpiracionToken(Instant.now().plusSeconds(86400))
                 .fechaRegistro(Instant.now())
                 .esUsuarioEmpleado(false)
                 .activoComoEmpleado(false)
                 .build();
-        // saveAndFlush: la fila debe existir en la transacción antes de auditar (FK id_usuario).
+        // saveAndFlush: la fila debe existir en la transacción antes de auditar/emitir token (FK id_usuario).
         usuarioRepository.saveAndFlush(usuario);
         auditoriaService.registrar(AuditoriaEvento.builder()
                 .idUsuario(usuario.getId())
@@ -69,11 +74,13 @@ public class CredencialesUsuarioService {
                         "tipoUsuario", usuario.getTipoUsuario().name(),
                         "planSuscripcion", usuario.getPlanSuscripcion().name()))
                 .build());
-        // TODO: EmailNotificacionService — enviar verificación (RF-AUTH-001, Etapa 1)
+        var tokenVerificacion =
+                tokenSeguridadService.emitir(usuario, TipoToken.VERIFICACION_EMAIL, VIGENCIA_VERIFICACION);
+        emailNotificacionService.enviarVerificacionEmail(usuario, tokenVerificacion);
         return Map.of(
                 "usuario", UsuarioResponse.from(usuario),
                 "requiereVerificacion", true,
-                "emailEnviado", false,
+                "emailEnviado", true,
                 "esEmpleado", false);
     }
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,8 +15,11 @@ import com.reforma.domain.auditoria.service.AuditoriaService;
 import com.reforma.domain.auth.jwt.TokenJwtServicio;
 import com.reforma.domain.usuarios.dto.LoginRequest;
 import com.reforma.domain.usuarios.dto.RegistroRequest;
+import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
+import com.reforma.domain.usuarios.token.domain.TipoToken;
+import com.reforma.domain.usuarios.token.service.TokenSeguridadService;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,6 +40,8 @@ class CredencialesUsuarioServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private TokenJwtServicio tokenJwtServicio;
     @Mock private AuditoriaService auditoriaService;
+    @Mock private TokenSeguridadService tokenSeguridadService;
+    @Mock private EmailNotificacionService emailNotificacionService;
 
     @InjectMocks private CredencialesUsuarioService servicio;
 
@@ -44,15 +50,19 @@ class CredencialesUsuarioServiceTest {
     // ---------- registro ----------
 
     @Test
-    @DisplayName("registro: persiste con saveAndFlush y audita acción REGISTRO")
+    @DisplayName("registro: persiste con saveAndFlush, audita REGISTRO y emite token + email de verificación")
     void registro_auditaAlta() {
         var request = new RegistroRequest("Nuevo@Reforma.com ", "Clave123", "Ana", "Pérez", null);
         when(usuarioRepository.existsByEmailIgnoreCase("Nuevo@Reforma.com ")).thenReturn(false);
         when(passwordEncoder.encode("Clave123")).thenReturn("hash");
+        when(tokenSeguridadService.emitir(
+                        any(Usuario.class), eq(TipoToken.VERIFICACION_EMAIL), any()))
+                .thenReturn("token-plano");
 
         var resultado = servicio.registrarUsuario(request);
 
         assertThat(resultado.get("requiereVerificacion")).isEqualTo(true);
+        assertThat(resultado.get("emailEnviado")).isEqualTo(true);
         verify(usuarioRepository).saveAndFlush(any(Usuario.class));
         verify(auditoriaService).registrar(eventoCaptor.capture());
         AuditoriaEvento evento = eventoCaptor.getValue();
@@ -60,6 +70,7 @@ class CredencialesUsuarioServiceTest {
         assertThat(evento.tablaOrigen()).isEqualTo("t_usuarios");
         assertThat(evento.idUsuario()).isNotBlank();
         assertThat(evento.datosNuevos()).isNotNull();
+        verify(emailNotificacionService).enviarVerificacionEmail(any(Usuario.class), eq("token-plano"));
     }
 
     @Test

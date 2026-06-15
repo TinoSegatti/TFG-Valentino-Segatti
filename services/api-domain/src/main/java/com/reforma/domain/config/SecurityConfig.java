@@ -25,6 +25,8 @@ public class SecurityConfig {
         "/api/usuarios/google/verify",
         "/api/usuarios/verificar-email",
         "/api/usuarios/reenviar-verificacion",
+        "/api/usuarios/solicitar-reset",
+        "/api/usuarios/confirmar-reset",
         "/api/suscripcion/planes",
         "/v3/api-docs/**",
         "/swagger-ui/**",
