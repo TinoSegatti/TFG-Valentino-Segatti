@@ -15,6 +15,9 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
       @if (sessionExpired()) {
         <p class="notice">Tu sesión expiró. Ingresá de nuevo.</p>
       }
+      @if (resetOk()) {
+        <p class="ok">Tu contraseña fue actualizada. Ingresá con la nueva.</p>
+      }
       <form (ngSubmit)="onSubmit()">
         <label>
           Email
@@ -29,7 +32,12 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
         }
         <button type="submit" [disabled]="loading()">Ingresar</button>
       </form>
-      <p><a routerLink="/">Volver</a></p>
+      <nav class="links">
+        <a routerLink="/auth/registro">Crear cuenta</a>
+        <a routerLink="/auth/olvide-password">¿Olvidaste tu contraseña?</a>
+        <a routerLink="/auth/reenviar-verificacion">Reenviar verificación</a>
+        <a routerLink="/">Volver</a>
+      </nav>
     </main>
   `,
   styles: [
@@ -62,6 +70,18 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
         padding: 0.5rem 0.75rem;
         border-radius: 4px;
       }
+      .ok {
+        color: #065f46;
+        background: #d1fae5;
+        padding: 0.5rem 0.75rem;
+        border-radius: 4px;
+      }
+      .links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
       button {
         padding: 0.6rem;
         background: #166534;
@@ -83,9 +103,11 @@ export class LoginComponent implements OnInit {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly sessionExpired = signal(false);
+  readonly resetOk = signal(false);
 
   ngOnInit(): void {
     this.sessionExpired.set(this.route.snapshot.queryParamMap.get('sesion') === 'expirada');
+    this.resetOk.set(this.route.snapshot.queryParamMap.get('reset') === 'ok');
   }
 
   onSubmit(): void {
