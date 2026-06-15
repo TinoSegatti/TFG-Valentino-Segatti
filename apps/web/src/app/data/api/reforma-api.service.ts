@@ -43,6 +43,46 @@ export class ReformaApiService {
     return this.http.post<AuthResponse>(`${this.base}/api/usuarios/login`, { email, password });
   }
 
+  registrar(request: {
+    email: string;
+    password: string;
+    nombreUsuario: string;
+    apellidoUsuario: string;
+  }): Observable<{ requiereVerificacion: boolean; emailEnviado: boolean }> {
+    return this.http.post<{ requiereVerificacion: boolean; emailEnviado: boolean }>(
+      `${this.base}/api/usuarios/registro`,
+      request,
+    );
+  }
+
+  verificarEmail(token: string): Observable<{ verificado: boolean }> {
+    return this.http.post<{ verificado: boolean }>(
+      `${this.base}/api/usuarios/verificar-email`,
+      { token },
+    );
+  }
+
+  reenviarVerificacion(email: string): Observable<{ enviado: boolean }> {
+    return this.http.post<{ enviado: boolean }>(
+      `${this.base}/api/usuarios/reenviar-verificacion`,
+      { email },
+    );
+  }
+
+  solicitarReset(email: string): Observable<{ enviado: boolean }> {
+    return this.http.post<{ enviado: boolean }>(
+      `${this.base}/api/usuarios/solicitar-reset`,
+      { email },
+    );
+  }
+
+  confirmarReset(token: string, nuevaPassword: string): Observable<{ restablecido: boolean }> {
+    return this.http.post<{ restablecido: boolean }>(
+      `${this.base}/api/usuarios/confirmar-reset`,
+      { token, nuevaPassword },
+    );
+  }
+
   // === Granjas ===
   getGranjas(): Observable<Granja[]> {
     return this.http.get<Granja[]>(`${this.base}/api/granjas`);

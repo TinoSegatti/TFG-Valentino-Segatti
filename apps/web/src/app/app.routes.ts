@@ -14,6 +14,39 @@ export const routes: Routes = [
       import('./features/auth/login/login.component').then((m) => m.LoginComponent),
   },
   {
+    path: 'auth/registro',
+    loadComponent: () =>
+      import('./features/auth/registro/registro.component').then((m) => m.RegistroComponent),
+  },
+  {
+    path: 'auth/verificar-email',
+    loadComponent: () =>
+      import('./features/auth/verificar-email/verificar-email.component').then(
+        (m) => m.VerificarEmailComponent,
+      ),
+  },
+  {
+    path: 'auth/reenviar-verificacion',
+    loadComponent: () =>
+      import('./features/auth/reenviar-verificacion/reenviar-verificacion.component').then(
+        (m) => m.ReenviarVerificacionComponent,
+      ),
+  },
+  {
+    path: 'auth/olvide-password',
+    loadComponent: () =>
+      import('./features/auth/olvide-password/olvide-password.component').then(
+        (m) => m.OlvidePasswordComponent,
+      ),
+  },
+  {
+    path: 'auth/restablecer',
+    loadComponent: () =>
+      import('./features/auth/restablecer/restablecer.component').then(
+        (m) => m.RestablecerComponent,
+      ),
+  },
+  {
     path: 'mis-plantas',
     canActivate: [authGuard],
     loadComponent: () =>
