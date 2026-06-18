@@ -17,6 +17,165 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-17 — Perfil de usuario, nombre de granja en la UI y baja del registro de logins fallidos
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** tres ajustes pedidos tras la primera ronda de pruebas.
+  - **Nombre de granja en el header** (antes mostraba el id): `granja-shell.component.ts` ahora carga `GET /api/granjas/{id}` y muestra `nombreGranja` (fallback al id si falla).
+  - **Perfil del usuario logueado:** nuevo `GET /api/usuarios/perfil` → `PerfilResponse` (id, email, nombre, apellido, `rol` OWNER/ADMIN/EDITOR/LECTOR, `esEmpleado`, `plan`, `idDueno`, `permisos` legibles). Backend `PerfilService` (+test); frontend pantalla `features/perfil` (ruta `/perfil`) con enlace en "Mis granjas". El JWT no lleva nombre/apellido, por eso se expone por endpoint.
+  - **No se almacenan logins fallidos:** se quitó `auditarFalloLogin` y sus 4 llamados de `CredencialesUsuarioService` (login sigue devolviendo 401/403, sin escribir `LOGIN_FALLIDO`). Tests actualizados; `LOGIN_FALLIDO` retirado del dropdown de filtros y de la guía. El enum se conserva por compatibilidad.
+  - **Validación:** suite **184/184** verde; en vivo: `GET /perfil` devuelve el perfil de `demo@reforma.local` (rol OWNER + permisos), `GET /api/granjas/g_demo` devuelve "Granja Demo", y un login con clave inválida (401) **no** genera fila de auditoría. Se borraron 5 filas `LOGIN_FALLIDO` históricas.
+- **Archivos:** `usuarios/{controller/UsuarioAuthRestController,service/{CredencialesUsuarioService,PerfilService},dto/PerfilResponse}` (+tests), `apps/web/.../features/{granja/granja-shell.component,perfil/perfil.component,mis-plantas/*}.ts`, `data/api/reforma-api.service.ts`, `data/models/{usuario,auditoria}.model.ts`, `app.routes.ts`, `CLAUDE.md`, `docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md`.
+
+### 2026-06-17 — Plan DEMO usable (2 granjas + 2 empleados), botón "Crear granja" y retención DEMO
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** desbloqueo de las pruebas manuales (la cuenta DEMO no podía crear granjas ni equipo, y crearlas exigía Swagger).
+  - **Límites DEMO ampliados** (`PlanService`): granjas 1→**2**, empleados 0→**2**. STARTER se subió a 2 granjas para no quedar por debajo de la prueba gratuita. Una cuenta DEMO ahora recorre el flujo completo (multi-granja + equipo/roles/revocación) sin upgrade.
+  - **Botón "Crear granja"** en "Mis granjas" (frontend): formulario visible solo para el dueño que pega a `POST /api/granjas`, refresca la lista y muestra el 403 de límite de plan. Ya no hace falta Swagger.
+  - **Retención de cuentas DEMO:** tarea `@Scheduled` diaria `LimpiezaCuentasDemoService` que **purga por completo** cada cuenta DEMO a los `DEMO_RETENCION_DIAS` (default 60) de su `fecha_registro` — granjas y datos granja-scoped, historial de precios (ML), auditoría, tokens/links y las cuentas (dueño + empleados). Borrado nativo ordenado en `PurgaCuentaDemoRepository` (anomalías de precio y auditoría antes de la cascada de `t_granja`; empleados antes del dueño). Configurable y con allowlist de exentos (`valentinosegatti@gmail.com`, `demo@reforma.local`). `@EnableScheduling` en `ReformaApplication`.
+  - **Validación:** suite **181/181** verde; orden de borrado verificado en vivo contra Postgres (tenant sintético en transacción revertida); límite DEMO=2 verificado en vivo por API (201, 201, **403** "Límite de granjas alcanzado para el plan DEMO").
+  - **Guía de pruebas** corregida: la cuenta con "Granja Demo" es `demo@reforma.local` (BUSINESS), no `valentinosegatti@gmail.com` (DEMO sin granjas); §4 reescrito sin Swagger; documentada la retención.
+- **Archivos:** `suscripciones/service/PlanService.java` (+test), `mantenimiento/{service/LimpiezaCuentasDemoService,repository/PurgaCuentaDemoRepository}` (+test), `usuarios/repository/UsuarioRepository.java`, `ReformaApplication.java`, `application.yml`, `apps/web/.../features/mis-plantas/mis-plantas.component.ts`, `docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md`, `CLAUDE.md`.
+- **Limpieza de entorno (misma fecha):** se borraron **todas** las cuentas creadas por formulario (9 cuentas + 73 filas de auditoría), dejando **una sola cuenta hardcodeada: `demo@reforma.local`** (BUSINESS, `u_demo`, con `g_demo`). `DevDataLoader` se reapuntó de `valentinosegatti@gmail.com` a `demo@reforma.local` (con check por email **y** por id `u_demo`) para que no recree la cuenta del autor ni choque con el PK `u_demo` al arrancar. Exentos de purga reducidos a `demo@reforma.local`.
+- **Pendiente:** definir política comercial real de límites/retención (hoy DEMO 60 días es provisional); commit + push del backlog acumulado.
+
+### 2026-06-16 — Etapa 5: consola de auditoría (RF-AUD)
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** lectura de `t_auditoria` (que ya se llenaba pero nadie consultaba). Endpoint
+  **`GET /api/auditoria`** (`@PreAuthorize` OWNER/ADMIN) con filtros opcionales `idGranja`, `idUsuario`,
+  `accion`, `desde`, `hasta` (instantes ISO) + paginación (`pagina`/`tamano`, máx 100), orden por
+  `fechaOperacion` desc.
+  - **Scoping multi-tenant** (`AuditoriaConsultaService`): el actor solo ve la actividad de su tenant
+    (dueño + sus empleados); un jefe ADMIN resuelve a su dueño; un empleado no-ADMIN → 403. Cada respuesta
+    enriquece el actor (`actorEmail`/`actorNombre`) con una sola consulta por página.
+  - **Fix PostgreSQL** "could not determine data type of parameter": el patrón `(:param is null or …)`
+    deja parámetros sin tipo inferible (enum/timestamp). Se reemplazó por **flags booleanos** `(:filtraX = false or col = :x)`,
+    de modo que cada valor solo aparece en su comparación tipada.
+  - **DTOs:** `AuditoriaResponse` (incluye datos antes/después como JSON crudo) y `PaginaAuditoria`
+    (no se serializa `Page` de Spring Data directamente).
+  - **Frontend:** `features/auditoria` (tabla de solo lectura con filtros, paginación y JSON expandible),
+    ruta `/auditoria` (authGuard), método `getAuditoria` en `reforma-api.service`, enlace en "Mis granjas"
+    visible solo para dueño/jefe (junto a "Equipo").
+- **Archivos:** `auditoria/{controller,service/AuditoriaConsultaService,repository,dto/{AuditoriaResponse,PaginaAuditoria}}`,
+  `apps/web/.../features/auditoria/*`, `data/models/auditoria.model.ts`, `reforma-api.service.ts`,
+  `app.routes.ts`, `features/mis-plantas/*`.
+- **Tests:** `AuditoriaConsultaServiceTest` (scoping dueño+empleados, jefe→dueño, no-ADMIN→403). Suite **177/177**.
+  `ng build` OK. Probado e2e en vivo: 401 sin token, 400 acción inválida, listado paginado (33 eventos/2 págs),
+  filtros por acción y rango de fechas → 200.
+- **Pendiente Etapa 5:** rate-limiting/lockout (Redis), cachear `token_version` en Redis, `X-Forwarded-For`
+  en nginx para IP real del cliente, `/security-review` del diff.
+
+### 2026-06-16 — Endurecimiento de sesión: revocación de JWT (tokenVersion)
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** se cierra el hueco de seguridad por el que un empleado desactivado o con el rol cambiado
+  conservaba un JWT válido hasta su expiración (hasta 24 h). Mecanismo **tokenVersion**:
+  - **Migración `V011__token_version.sql`**: columna `token_version INTEGER NOT NULL DEFAULT 0` en `t_usuarios`.
+  - **Entidad `Usuario`**: campo `tokenVersion` (`@Builder.Default = 0`) + método `revocarSesiones()` (incrementa la versión).
+  - **JWT**: `TokenJwtServicio.generarToken` agrega el claim `tv`; `validarToken` ahora compara el `tv` del token
+    con la versión vigente en BD (`UsuarioRepository.findTokenVersionById`, proyección liviana) y lanza
+    `JwtException` si no coincide → el filtro la captura y responde 401. Tokens viejos sin `tv` se asumen `0`
+    (no se cortan sesiones existentes al desplegar; la columna arranca en 0).
+  - **Puntos de revocación**: `EmpleadoService.cambiarRol` y `cambiarEstado(activo=false)`,
+    y `RecuperacionCuentaService.confirmarReset` (un reset invalida sesiones con la clave anterior).
+  - **Decisión**: chequeo dentro de `validarToken` (no en el filtro ni en el principal) → cero churn en los
+    `@WebMvcTest` (ya mockean `TokenJwtServicio`); el `JwtUserPrincipal` no cambia.
+- **Archivos principales:** `db/migration/V011__token_version.sql`, `usuarios/entity/Usuario.java`,
+  `usuarios/repository/UsuarioRepository.java`, `auth/jwt/TokenJwtServicio.java`,
+  `empleados/service/EmpleadoService.java`, `usuarios/service/RecuperacionCuentaService.java`.
+- **Tests:** nuevo `TokenJwtServicioTest` (4: tv coincide, tv revocado, usuario inexistente, empleado lleva rol/idDueno);
+  `EmpleadoServiceTest` (+1 reactivar no revoca) y aserciones de `tokenVersion` en cambiarRol/cambiarEstado/confirmarReset.
+  Suite **174/174** verde (corrida en contenedor Maven 3.9 / temurin-21).
+- **Probado e2e en vivo:** login → `GET /api/granjas` 200 → bump de `token_version` en BD → mismo token **401**
+  (revocado) → re-login 200. Flyway aplicó V011 (esquema en v011).
+- **Pendiente / futuro:** cachear `token_version` en Redis para ahorrar la lectura por request (hoy 1 query liviana);
+  rate-limiting/lockout (Etapa 0); endpoint de cambio de password autenticado (revocar también ahí); Etapa 5
+  (consola de auditoría). Nota operativa: la cuenta `valentinosegatti@gmail.com` quedó con contraseña `Demo1234!`.
+
+### 2026-06-16 — Email SMTP real (RF-AUTH): cableado de variables
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** se completa el envío de correos real. La lógica ya existía (`SmtpEmailNotificacionService`,
+  activado por `reforma.email.mode=smtp`; `application.yml` ya leía `SMTP_*`/`EMAIL_MODE`/`EMAIL_FROM`),
+  pero las variables **no llegaban al contenedor**. Se agregan `EMAIL_MODE`, `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` al bloque `environment` de `api-domain` en `docker-compose.yml`
+  (con defaults; `EMAIL_FROM` cae a `SMTP_USER` y luego `no-reply@reforma.local`). Documentadas en `.env.example`
+  (modo `log` por defecto) y cargadas en `.env` local con Gmail App Password de `reforma.soft.co@gmail.com`
+  (`EMAIL_MODE=smtp`). Nota: el App Password debe ir **sin espacios** (JavaMailSender no los limpia).
+- **Archivos principales:** `docker-compose.yml`, `.env.example`, `.env` (ignorado por git).
+- **Probado e2e:** `POST /solicitar-reset` con `valentinosegatti@gmail.com` → correo recibido, contraseña
+  restablecida e ingreso a la plataforma OK. Detección clave: la imagen `api-domain` cacheada (build 2026-06-14)
+  no contenía `SmtpEmailNotificacionService`; se requirió `docker compose up -d --build api-domain`.
+- **Pendiente:** Google OAuth sigue pendiente.
+
+### 2026-06-16 — Módulo Usuarios · Etapa 4: gestión de equipo + matriz de roles
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** se hacen efectivos los roles (antes solo se bloqueaba a LECTOR): jerarquía dueño/jefe/editor/lector
+  con permisos reales, gestión de equipo y candado de creación de granjas. **Sin migración.**
+  - **Granja OWNER-only:** `POST /api/granjas` ahora exige `ROLE_OWNER` (regla específica antes de la
+    de GRANJA_SCOPED en `SecurityConfig`). Los empleados ven y operan las granjas del dueño, pero no las crean;
+    el multi-planta sigue gateado por `PlanService.limiteGranjas`.
+  - **Matriz de roles** (en `EmpleadoService`, con `autorizarAccion`/`resolverDueno`): OWNER gestiona todo el
+    equipo incluido designar/quitar ADMIN; ADMIN (jefe) gestiona EDITOR/LECTOR pero **no** puede tocar a otro
+    ADMIN, designar ADMIN ni modificarse a sí mismo; EDITOR/LECTOR no gestionan (bloqueados por authority).
+  - **Endpoints:** `GET /api/empleados` (listar equipo), `PUT /api/empleados/{id}/rol`, `PUT /api/empleados/{id}/activo`
+    (baja/alta lógica, ADR-0005), todos `@PreAuthorize("hasAnyRole('OWNER','ADMIN')")`. `POST /api/empleados`
+    (invitar) ahora **delegable a jefes ADMIN** (un ADMIN no puede invitar otro ADMIN). DTOs `CambiarRolEmpleadoRequest`,
+    `CambiarEstadoEmpleadoRequest`. Auditoría `CAMBIO_ROL_EMPLEADO` / `DESACTIVAR_EMPLEADO`.
+  - **Login bloquea empleados desactivados:** `iniciarSesion` rechaza con 403 si `esUsuarioEmpleado && !activoComoEmpleado`
+    (mitigación inmediata; la revocación de tokens en vuelo es el endurecimiento de sesión pendiente).
+  - **Frontend:** pantalla `features/equipo` (listar, invitar, cambiar rol, activar/desactivar) con UI adaptada al
+    rol (un jefe no ve la opción ADMIN ni acciones sobre otros ADMIN); helper `decodeJwtClaims` en `jwt.utils`;
+    métodos de API (`getEmpleados`/`invitarEmpleado`/`cambiarRolEmpleado`/`cambiarEstadoEmpleado`); ruta `/equipo`
+    (authGuard) + enlace en "Mis granjas" visible solo para dueño/jefe.
+- **Tests:** `EmpleadoServiceTest` ampliado a 15 (invitar por ADMIN, jefe no crea/designa ADMIN, jefe no toca otro
+  ADMIN, no auto-modificación, cambiar rol/estado, aislamiento de tenant 404); `CredencialesUsuarioServiceTest`
+  +1 (empleado desactivado → 403). Suite unitaria **169/169 verde** (antes 158). Frontend `ng build` OK.
+- **Archivos principales:** `empleados/**` (service/controller/dtos), `config/SecurityConfig.java`,
+  `usuarios/service/CredencialesUsuarioService.java`, `usuarios/repository/UsuarioRepository.java`;
+  frontend `features/equipo/**`, `features/mis-plantas`, `core/auth/jwt.utils.ts`, `data/api/reforma-api.service.ts`,
+  `data/models/usuario.model.ts`, `app.routes.ts`.
+- **Pendiente:** smoke en vivo del flujo de equipo; **endurecimiento de sesión** (revocación de JWT en vuelo al
+  desactivar/bajar de rol — `tokenVersion`/`jti`+Redis); rate-limit/lockout; cookie HttpOnly para el JWT; Etapa 5
+  (consola de auditoría). Confirmar si STARTER debe permitir >1 planta (hoy `limiteGranjas`: DEMO/STARTER 1, BUSINESS 3, ENTERPRISE ∞).
+
+### 2026-06-15 — Módulo Usuarios · Etapas 2+3: invitación y cuentas de empleado
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** onboarding de empleados por invitación (token de un solo uso) + multi-tenancy efectiva
+  (un empleado opera sobre las granjas de su dueño) + autorización por rol. **Sin migración** (la
+  tabla `t_usuarios` de V001 ya modelaba el vínculo dueño↔empleado).
+  - **Invitación (Etapa 2):** nuevo paquete `empleados/` (`EmpleadoService`, `EmpleadoRestController`,
+    DTOs `InvitarEmpleadoRequest`/`AceptarInvitacionRequest`/`EmpleadoResponse`).
+    `POST /api/empleados` (solo dueño, `ROLE_OWNER`) crea un empleado **pendiente** (`passwordHash=null`,
+    `activoComoEmpleado=false`, snapshot no-nulo de plan/maxGranjas heredado del dueño), aplica
+    plan-gating (`PlanService.limiteEmpleados`, valores **provisionales** DEMO 0 / STARTER 2 /
+    BUSINESS 10 / ENTERPRISE ∞ — `// TODO ajustar`), emite token `INVITACION_EMPLEADO` (72 h) y
+    envía email. Email ya existente en cualquier rol → 409 (cuentas separadas, decisión §0).
+    Auditoría CREAR_EMPLEADO. Nuevo `EmailNotificacionService.enviarInvitacionEmpleado` (log del enlace
+    `/auth/aceptar-invitacion?token=`).
+  - **Aceptación + cuentas (Etapa 3):** `POST /api/empleados/aceptar` (público) consume el token, fija
+    la contraseña (bcrypt) y activa al empleado (`emailVerificado=true`, `activoComoEmpleado=true`,
+    `fechaVinculacion`). Auditoría ACEPTAR_INVITACION.
+  - **JWT enriquecido:** claims `esEmpleado`/`rolEmpleado`/`idDueno` en `TokenJwtServicio`;
+    `JwtUserPrincipal` expone `tenantId()` y authorities `ROLE_OWNER` (dueño) / `ROLE_ADMIN|EDITOR|LECTOR`
+    (empleado). Compatibilidad con tokens viejos (claims ausentes → no-empleado).
+  - **Multi-tenancy:** nuevo `SecurityUtils.requireTenantId()` (dueño efectivo). Los 8 controllers
+    granja-scoped (granjas, materias-primas, proveedores, animales, compras, formulas, fabricaciones,
+    inventario) ahora scopean por tenant, no por usuario → un empleado accede a las granjas del dueño.
+    Se cerró el `TODO` de `GranjaAccesoService` (el tenant se resuelve en el borde del controller).
+  - **Autorización por rol:** en `SecurityConfig`, toda mutación (POST/PUT/PATCH/DELETE) granja-scoped
+    exige `ROLE_OWNER|ADMIN|EDITOR` → un `LECTOR` recibe 403 en escrituras (lectura y export CSV libres).
+  - **Frontend:** `features/auth/aceptar-invitacion` (molde de `restablecer`), ruta + método
+    `aceptarInvitacion` en `reforma-api.service.ts`, tipo `EmpleadoResponse`, aviso `?invitacion=ok` en login.
+- **Tests:** nuevo `EmpleadoServiceTest` (invitar OK / 409 dup / 403 sobre límite / 403 invitador-empleado /
+  aceptar OK / token inválido), `PlanServiceTest` cubre `limiteEmpleados`, 5 tests de controller
+  actualizados al nuevo `JwtUserPrincipal`. Suite unitaria **158/158 verde** (antes 152). Frontend `ng build` OK.
+- **Archivos principales:** `empleados/**`, `suscripciones/service/PlanService.java`,
+  `usuarios/repository/UsuarioRepository.java`, `usuarios/email/**`, `auth/jwt/{TokenJwtServicio,JwtUserPrincipal}.java`,
+  `auth/SecurityUtils.java`, `config/SecurityConfig.java`, `granjas/service/GranjaAccesoService.java`,
+  los 8 `*RestController` granja-scoped; frontend `features/auth/aceptar-invitacion/**`, `app.routes.ts`,
+  `data/api/reforma-api.service.ts`, `data/models/usuario.model.ts`, `features/auth/login`.
+- **Pendiente:** smoke en vivo end-to-end (login dueño → invitar → aceptar → login empleado → EDITOR opera /
+  LECTOR 403). Etapa 4 (gestión por el jefe ADMIN: `GET/PUT /api/empleados`, cambio de rol, baja lógica;
+  delegar invitación a jefes; revocación de sesión al desactivar). Confirmar valores de `limiteEmpleados`.
+
 ### 2026-06-14 — Módulo Usuarios · Etapa 1: verificación de email + recuperación de contraseña
 - **Autor/agente:** Claude Code (Opus 4.8)
 - **Qué:** ciclo de vida del dueño completo (registro → verificación → recuperación), backend + frontend.
