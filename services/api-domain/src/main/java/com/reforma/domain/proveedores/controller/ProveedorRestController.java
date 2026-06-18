@@ -29,8 +29,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Endpoints REST del módulo Proveedores (RF-PROV-*). Multi-tenant por path:
- * {@code /api/proveedores/{idGranja}[/{id}]}. El {@code idUsuario} sale del JWT
- * vía {@link SecurityUtils#requireUserId()}, no del cliente.
+ * {@code /api/proveedores/{idGranja}[/{id}]}. El tenant efectivo (dueño) sale del JWT
+ * vía {@link SecurityUtils#requireTenantId()}, no del cliente; así un empleado opera
+ * sobre las granjas de su dueño.
  */
 @RestController
 @RequestMapping("/api/proveedores/{idGranja}")
@@ -43,14 +44,14 @@ public class ProveedorRestController {
     public List<ProveedorResponse> listar(
             @PathVariable String idGranja,
             @RequestParam(name = "buscar", required = false) String buscar) {
-        return proveedorService.listarPorGranja(SecurityUtils.requireUserId(), idGranja, buscar);
+        return proveedorService.listarPorGranja(SecurityUtils.requireTenantId(), idGranja, buscar);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProveedorResponse crear(
             @PathVariable String idGranja, @Valid @RequestBody ProveedorRequest request) {
-        return proveedorService.crear(SecurityUtils.requireUserId(), idGranja, request);
+        return proveedorService.crear(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idProveedor}")
@@ -59,13 +60,13 @@ public class ProveedorRestController {
             @PathVariable Long idProveedor,
             @Valid @RequestBody ProveedorRequest request) {
         return proveedorService.actualizar(
-                SecurityUtils.requireUserId(), idGranja, idProveedor, request);
+                SecurityUtils.requireTenantId(), idGranja, idProveedor, request);
     }
 
     @DeleteMapping("/{idProveedor}")
     public ResponseEntity<Void> desactivar(
             @PathVariable String idGranja, @PathVariable Long idProveedor) {
-        proveedorService.desactivar(SecurityUtils.requireUserId(), idGranja, idProveedor);
+        proveedorService.desactivar(SecurityUtils.requireTenantId(), idGranja, idProveedor);
         return ResponseEntity.noContent().build();
     }
 
@@ -75,7 +76,7 @@ public class ProveedorRestController {
      */
     @GetMapping(value = "/csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable String idGranja) {
-        String csv = proveedorService.exportarCsv(SecurityUtils.requireUserId(), idGranja);
+        String csv = proveedorService.exportarCsv(SecurityUtils.requireTenantId(), idGranja);
         byte[] cuerpo = csv.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -93,7 +94,7 @@ public class ProveedorRestController {
         }
         try {
             return proveedorService.importarCsv(
-                    SecurityUtils.requireUserId(), idGranja, archivo.getInputStream());
+                    SecurityUtils.requireTenantId(), idGranja, archivo.getInputStream());
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "No se pudo leer el archivo: " + e.getMessage());

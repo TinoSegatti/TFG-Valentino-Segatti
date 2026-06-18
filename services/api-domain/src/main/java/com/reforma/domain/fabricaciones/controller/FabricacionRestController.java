@@ -30,20 +30,20 @@ public class FabricacionRestController {
 
     @GetMapping
     public List<FabricacionResumenResponse> listar(@PathVariable String idGranja) {
-        return fabricacionService.listar(SecurityUtils.requireUserId(), idGranja);
+        return fabricacionService.listar(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idFabricacion}")
     public FabricacionCompletaResponse obtener(
             @PathVariable String idGranja, @PathVariable String idFabricacion) {
-        return fabricacionService.obtener(SecurityUtils.requireUserId(), idGranja, idFabricacion);
+        return fabricacionService.obtener(SecurityUtils.requireTenantId(), idGranja, idFabricacion);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public FabricacionCompletaResponse crearCabecera(
             @PathVariable String idGranja, @Valid @RequestBody FabricacionCabeceraRequest request) {
-        return fabricacionService.crearCabecera(SecurityUtils.requireUserId(), idGranja, request);
+        return fabricacionService.crearCabecera(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idFabricacion}")
@@ -52,13 +52,13 @@ public class FabricacionRestController {
             @PathVariable String idFabricacion,
             @Valid @RequestBody FabricacionCabeceraRequest request) {
         return fabricacionService.actualizarCabecera(
-                SecurityUtils.requireUserId(), idGranja, idFabricacion, request);
+                SecurityUtils.requireTenantId(), idGranja, idFabricacion, request);
     }
 
     @DeleteMapping("/{idFabricacion}")
     public ResponseEntity<Void> eliminar(
             @PathVariable String idGranja, @PathVariable String idFabricacion) {
-        fabricacionService.eliminar(SecurityUtils.requireUserId(), idGranja, idFabricacion);
+        fabricacionService.eliminar(SecurityUtils.requireTenantId(), idGranja, idFabricacion);
         return ResponseEntity.noContent().build();
     }
 
@@ -68,6 +68,6 @@ public class FabricacionRestController {
             @PathVariable String idFabricacion,
             @Valid @RequestBody GuardarFabricacionDetalleRequest request) {
         return fabricacionService.guardarDetalle(
-                SecurityUtils.requireUserId(), idGranja, idFabricacion, request);
+                SecurityUtils.requireTenantId(), idGranja, idFabricacion, request);
     }
 }

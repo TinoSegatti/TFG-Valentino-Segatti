@@ -30,7 +30,7 @@ public class InventarioRestController {
 
     @GetMapping
     public InventarioListadoResponse listar(@PathVariable String idGranja) {
-        return inventarioService.listar(SecurityUtils.requireUserId(), idGranja);
+        return inventarioService.listar(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @PostMapping("/inicializar")
@@ -38,7 +38,7 @@ public class InventarioRestController {
     public List<InventarioResponse> inicializar(
             @PathVariable String idGranja,
             @Valid @RequestBody InicializarInventarioRequest request) {
-        return inventarioService.inicializar(SecurityUtils.requireUserId(), idGranja, request);
+        return inventarioService.inicializar(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/materia-prima/{idMateriaPrima}/cantidad-real")
@@ -47,17 +47,17 @@ public class InventarioRestController {
             @PathVariable Long idMateriaPrima,
             @Valid @RequestBody ActualizarCantidadRealRequest request) {
         return inventarioService.actualizarCantidadReal(
-                SecurityUtils.requireUserId(), idGranja, idMateriaPrima, request);
+                SecurityUtils.requireTenantId(), idGranja, idMateriaPrima, request);
     }
 
     @PostMapping("/recalcular")
     public InventarioListadoResponse recalcular(@PathVariable String idGranja) {
-        return inventarioService.recalcularTodo(SecurityUtils.requireUserId(), idGranja);
+        return inventarioService.recalcularTodo(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @DeleteMapping
     public ResponseEntity<Void> vaciar(@PathVariable String idGranja) {
-        inventarioService.vaciar(SecurityUtils.requireUserId(), idGranja);
+        inventarioService.vaciar(SecurityUtils.requireTenantId(), idGranja);
         return ResponseEntity.noContent().build();
     }
 }
