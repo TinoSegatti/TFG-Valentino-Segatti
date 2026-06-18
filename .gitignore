@@ -11,6 +11,8 @@
 
 # --- Documentos de contexto interno (no se publican) ---
 CONTEXTO_AGENTE_IA.md
+docs/MODULO_USUARIOS.md
+docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md
 
 # --- Java / Maven (api-domain) ---
 services/api-domain/target/

@@ -1,6 +1,19 @@
 spring:
   application:
     name: reforma-api-domain
+  # Envío de correos. En modo SMTP (reforma.email.mode=smtp) se usan estas credenciales.
+  # Para Gmail: host smtp.gmail.com, puerto 587, y una "Contraseña de aplicación" (no la clave normal).
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   jpa:
     open-in-view: false
     hibernate:
@@ -39,3 +52,15 @@ reforma:
     base-url: ${ML_BASE_URL:http://localhost:8081}
     secret: ${JWT_ML_SECRET:dev_ml_jwt_secret_minimo_64_caracteres_compartido_domain_ml}
   frontend-url: ${FRONTEND_URL:http://localhost:4200}
+  # Modo de envío de email: "log" (default, escribe el enlace en el log) o "smtp" (envío real).
+  email:
+    mode: ${EMAIL_MODE:log}
+    from: ${EMAIL_FROM:${SMTP_USER:no-reply@reforma.local}}
+  # Retención de cuentas de prueba: una cuenta DEMO se purga por completo (datos, historial ML,
+  # auditoría, tokens/links y la propia cuenta) a los N días de su registro. Ver LimpiezaCuentasDemoService.
+  demo:
+    purga-habilitada: ${DEMO_PURGA_HABILITADA:true}
+    retencion-dias: ${DEMO_RETENCION_DIAS:60}
+    purga-cron: ${DEMO_PURGA_CRON:0 0 3 * * *}
+    # Emails nunca purgados (la cuenta demo hardcodeada), separados por coma.
+    emails-exentos: ${DEMO_EMAILS_EXENTOS:demo@reforma.local}
