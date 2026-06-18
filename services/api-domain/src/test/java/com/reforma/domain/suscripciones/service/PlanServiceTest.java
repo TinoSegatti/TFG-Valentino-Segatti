@@ -15,8 +15,8 @@ class PlanServiceTest {
 
     @Test
     void limiteGranjasPorPlan() {
-        assertThat(planService.limiteGranjas(PlanSuscripcion.DEMO)).isEqualTo(1);
-        assertThat(planService.limiteGranjas(PlanSuscripcion.STARTER)).isEqualTo(1);
+        assertThat(planService.limiteGranjas(PlanSuscripcion.DEMO)).isEqualTo(2);
+        assertThat(planService.limiteGranjas(PlanSuscripcion.STARTER)).isEqualTo(2);
         assertThat(planService.limiteGranjas(PlanSuscripcion.BUSINESS)).isEqualTo(3);
         assertThat(planService.limiteGranjas(PlanSuscripcion.ENTERPRISE))
                 .isEqualTo(Integer.MAX_VALUE);
@@ -55,6 +55,16 @@ class PlanServiceTest {
         assertThat(planService.limiteFabricaciones(PlanSuscripcion.STARTER)).isEqualTo(50);
         assertThat(planService.limiteFabricaciones(PlanSuscripcion.BUSINESS)).isEqualTo(500);
         assertThat(planService.limiteFabricaciones(PlanSuscripcion.ENTERPRISE))
+                .isEqualTo(Integer.MAX_VALUE);
+    }
+
+    @Test
+    void limiteEmpleadosPorPlan() {
+        // DEMO habilita 2 invitaciones para el recorrido de prueba (ver PlanService#limiteEmpleados).
+        assertThat(planService.limiteEmpleados(PlanSuscripcion.DEMO)).isEqualTo(2);
+        assertThat(planService.limiteEmpleados(PlanSuscripcion.STARTER)).isEqualTo(2);
+        assertThat(planService.limiteEmpleados(PlanSuscripcion.BUSINESS)).isEqualTo(10);
+        assertThat(planService.limiteEmpleados(PlanSuscripcion.ENTERPRISE))
                 .isEqualTo(Integer.MAX_VALUE);
     }
 }
