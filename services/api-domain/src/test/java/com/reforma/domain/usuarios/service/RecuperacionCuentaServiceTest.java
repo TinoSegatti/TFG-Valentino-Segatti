@@ -135,6 +135,8 @@ class RecuperacionCuentaServiceTest {
 
         assertThat(usuario.getPasswordHash()).isEqualTo("nuevo-hash");
         assertThat(usuario.getEmailVerificado()).isTrue();
+        // El reset revoca las sesiones abiertas con la clave anterior (tokenVersion 0 → 1).
+        assertThat(usuario.getTokenVersion()).isEqualTo(1);
         verify(auditoriaService).registrar(eventoCaptor.capture());
         assertThat(eventoCaptor.getValue().accion()).isEqualTo(AccionAuditoria.RESET_PASSWORD);
     }

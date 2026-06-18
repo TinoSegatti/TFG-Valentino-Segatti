@@ -18,6 +18,9 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
       @if (resetOk()) {
         <p class="ok">Tu contraseña fue actualizada. Ingresá con la nueva.</p>
       }
+      @if (invitacionOk()) {
+        <p class="ok">Tu cuenta de empleado fue activada. Ingresá con tu nueva contraseña.</p>
+      }
       <form (ngSubmit)="onSubmit()">
         <label>
           Email
@@ -104,10 +107,12 @@ export class LoginComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly sessionExpired = signal(false);
   readonly resetOk = signal(false);
+  readonly invitacionOk = signal(false);
 
   ngOnInit(): void {
     this.sessionExpired.set(this.route.snapshot.queryParamMap.get('sesion') === 'expirada');
     this.resetOk.set(this.route.snapshot.queryParamMap.get('reset') === 'ok');
+    this.invitacionOk.set(this.route.snapshot.queryParamMap.get('invitacion') === 'ok');
   }
 
   onSubmit(): void {

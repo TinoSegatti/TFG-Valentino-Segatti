@@ -27,12 +27,31 @@ public class SecurityConfig {
         "/api/usuarios/reenviar-verificacion",
         "/api/usuarios/solicitar-reset",
         "/api/usuarios/confirmar-reset",
+        "/api/empleados/aceptar",
         "/api/suscripcion/planes",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html",
         "/actuator/health"
     };
+
+    /**
+     * Recursos granja-scoped: toda mutación (POST/PUT/PATCH/DELETE) queda vedada al rol LECTOR
+     * (solo lectura). Los GET — incluida la exportación CSV — siguen abiertos a cualquier rol
+     * autenticado con acceso al tenant. La importación CSV es POST, por lo que también se bloquea.
+     */
+    private static final String[] GRANJA_SCOPED = {
+        "/api/granjas/**",
+        "/api/materias-primas/**",
+        "/api/proveedores/**",
+        "/api/animales/**",
+        "/api/compras/**",
+        "/api/formulas/**",
+        "/api/fabricaciones/**",
+        "/api/inventario/**"
+    };
+
+    private static final String[] ROLES_ESCRITURA = {"OWNER", "ADMIN", "EDITOR"};
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -43,6 +62,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Crear granjas/plantas es exclusivo del dueño (gateado por límite de plan);
+                        // los empleados las ven y operan, pero no pueden crearlas. Regla más específica
+                        // que la de GRANJA_SCOPED, por eso va primero.
+                        .requestMatchers(HttpMethod.POST, "/api/granjas").hasRole("OWNER")
+                        .requestMatchers(HttpMethod.POST, GRANJA_SCOPED).hasAnyRole(ROLES_ESCRITURA)
+                        .requestMatchers(HttpMethod.PUT, GRANJA_SCOPED).hasAnyRole(ROLES_ESCRITURA)
+                        .requestMatchers(HttpMethod.PATCH, GRANJA_SCOPED).hasAnyRole(ROLES_ESCRITURA)
+                        .requestMatchers(HttpMethod.DELETE, GRANJA_SCOPED).hasAnyRole(ROLES_ESCRITURA)
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (request, response, authException) ->
