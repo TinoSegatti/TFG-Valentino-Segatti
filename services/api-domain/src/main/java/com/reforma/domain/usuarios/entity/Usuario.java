@@ -108,4 +108,21 @@ public class Usuario {
 
     @Column(name = "activo_como_empleado", nullable = false)
     private Boolean activoComoEmpleado;
+
+    /**
+     * Versión de sesión. El JWT emitido lleva este valor (claim {@code tv}); al validar un token
+     * se exige que coincida con el de la BD. Incrementarlo revoca todos los tokens en vuelo.
+     */
+    @Builder.Default
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
+    /**
+     * Revoca las sesiones en vuelo incrementando {@link #tokenVersion}: cualquier JWT emitido con
+     * la versión anterior dejará de validar. Se invoca al desactivar/cambiar de rol o restablecer
+     * la contraseña.
+     */
+    public void revocarSesiones() {
+        this.tokenVersion = (this.tokenVersion == null ? 0 : this.tokenVersion) + 1;
+    }
 }

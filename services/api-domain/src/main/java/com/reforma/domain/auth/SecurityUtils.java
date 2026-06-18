@@ -19,4 +19,13 @@ public final class SecurityUtils {
     public static String requireUserId() {
         return requirePrincipal().id();
     }
+
+    /**
+     * Tenant efectivo sobre el que opera el usuario autenticado: el id del dueño para un
+     * empleado vinculado, o su propio id para un dueño. Los recursos granja-scoped viven bajo
+     * el dueño, por lo que los controllers deben scopear con este id, no con {@link #requireUserId()}.
+     */
+    public static String requireTenantId() {
+        return requirePrincipal().tenantId();
+    }
 }

@@ -73,6 +73,8 @@ public class RecuperacionCuentaService {
         usuario.setPasswordHash(passwordEncoder.encode(nuevaPassword));
         // Controlar el email implica probarlo: si no estaba verificado, queda verificado.
         usuario.setEmailVerificado(true);
+        // Un reset de contraseña invalida cualquier sesión abierta con la clave anterior.
+        usuario.revocarSesiones();
         auditar(usuario, AccionAuditoria.RESET_PASSWORD, "Contraseña restablecida");
     }
 

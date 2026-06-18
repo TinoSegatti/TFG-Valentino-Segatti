@@ -47,10 +47,35 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'auth/aceptar-invitacion',
+    loadComponent: () =>
+      import('./features/auth/aceptar-invitacion/aceptar-invitacion.component').then(
+        (m) => m.AceptarInvitacionComponent,
+      ),
+  },
+  {
     path: 'mis-plantas',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/mis-plantas/mis-plantas.component').then((m) => m.MisPlantasComponent),
+  },
+  {
+    path: 'perfil',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/perfil/perfil.component').then((m) => m.PerfilComponent),
+  },
+  {
+    path: 'equipo',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/equipo/equipo.component').then((m) => m.EquipoComponent),
+  },
+  {
+    path: 'auditoria',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/auditoria/auditoria.component').then((m) => m.AuditoriaComponent),
   },
   {
     path: 'granja/:idGranja',

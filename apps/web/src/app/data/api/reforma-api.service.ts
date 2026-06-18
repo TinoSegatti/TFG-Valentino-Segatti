@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse } from '../models/usuario.model';
+import { AuthResponse, EmpleadoResponse, Perfil, RolEmpleado } from '../models/usuario.model';
 import { Granja } from '../models/granja.model';
 import { MateriaPrima, MateriaPrimaRequest } from '../models/materia-prima.model';
 import { Proveedor, ProveedorRequest } from '../models/proveedor.model';
@@ -32,6 +32,7 @@ import {
   GuardarFabricacionDetalleRequest,
 } from '../models/fabricacion.model';
 import { CsvImportResult } from '../models/csv.model';
+import { FiltrosAuditoria, PaginaAuditoria } from '../models/auditoria.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -81,6 +82,56 @@ export class ReformaApiService {
       `${this.base}/api/usuarios/confirmar-reset`,
       { token, nuevaPassword },
     );
+  }
+
+  /** El empleado fija su contraseña con el token de invitación (público). */
+  aceptarInvitacion(token: string, password: string): Observable<EmpleadoResponse> {
+    return this.http.post<EmpleadoResponse>(
+      `${this.base}/api/empleados/aceptar`,
+      { token, password },
+    );
+  }
+
+  /** Perfil del usuario autenticado (identidad, rol y permisos). */
+  getPerfil(): Observable<Perfil> {
+    return this.http.get<Perfil>(`${this.base}/api/usuarios/perfil`);
+  }
+
+  // === Empleados (gestión de equipo: dueño y jefe ADMIN) ===
+  getEmpleados(): Observable<EmpleadoResponse[]> {
+    return this.http.get<EmpleadoResponse[]>(`${this.base}/api/empleados`);
+  }
+
+  invitarEmpleado(request: {
+    email: string;
+    nombreUsuario: string;
+    apellidoUsuario: string;
+    rol: RolEmpleado;
+  }): Observable<EmpleadoResponse> {
+    return this.http.post<EmpleadoResponse>(`${this.base}/api/empleados`, request);
+  }
+
+  cambiarRolEmpleado(idEmpleado: string, rol: RolEmpleado): Observable<EmpleadoResponse> {
+    return this.http.put<EmpleadoResponse>(`${this.base}/api/empleados/${idEmpleado}/rol`, { rol });
+  }
+
+  cambiarEstadoEmpleado(idEmpleado: string, activo: boolean): Observable<EmpleadoResponse> {
+    return this.http.put<EmpleadoResponse>(`${this.base}/api/empleados/${idEmpleado}/activo`, {
+      activo,
+    });
+  }
+
+  // === Auditoría (consola de solo lectura: dueño y jefe ADMIN) ===
+  getAuditoria(filtros: FiltrosAuditoria): Observable<PaginaAuditoria> {
+    let params = new HttpParams()
+      .set('pagina', String(filtros.pagina ?? 0))
+      .set('tamano', String(filtros.tamano ?? 20));
+    if (filtros.idGranja) params = params.set('idGranja', filtros.idGranja);
+    if (filtros.idUsuario) params = params.set('idUsuario', filtros.idUsuario);
+    if (filtros.accion) params = params.set('accion', filtros.accion);
+    if (filtros.desde) params = params.set('desde', filtros.desde);
+    if (filtros.hasta) params = params.set('hasta', filtros.hasta);
+    return this.http.get<PaginaAuditoria>(`${this.base}/api/auditoria`, { params });
   }
 
   // === Granjas ===
