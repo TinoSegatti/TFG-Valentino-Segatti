@@ -31,4 +31,15 @@ public class LogEmailNotificacionService implements EmailNotificacionService {
         var enlace = properties.frontendUrl() + "/auth/restablecer?token=" + tokenPlano;
         log.info("[EMAIL:RESET] para {} -> {}", usuario.getEmail(), enlace);
     }
+
+    @Override
+    public void enviarInvitacionEmpleado(Usuario dueno, Usuario empleado, String tokenPlano) {
+        var enlace = properties.frontendUrl() + "/auth/aceptar-invitacion?token=" + tokenPlano;
+        log.info(
+                "[EMAIL:INVITACION] {} invita a {} (rol {}) -> {}",
+                dueno.getEmail(),
+                empleado.getEmail(),
+                empleado.getRolEmpleado(),
+                enlace);
+    }
 }

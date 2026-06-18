@@ -12,4 +12,11 @@ public interface EmailNotificacionService {
     void enviarVerificacionEmail(Usuario usuario, String tokenPlano);
 
     void enviarResetPassword(Usuario usuario, String tokenPlano);
+
+    /**
+     * Invitación a un empleado recién creado en estado pendiente. {@code dueno} aporta el
+     * contexto (quién invita) y {@code empleado} el destinatario; {@code tokenPlano} es el
+     * token de un solo uso (tipo {@code INVITACION_EMPLEADO}) que viaja en el enlace.
+     */
+    void enviarInvitacionEmpleado(Usuario dueno, Usuario empleado, String tokenPlano);
 }
