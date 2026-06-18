@@ -91,17 +91,20 @@ public class CredencialesUsuarioService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
         if (usuario.getPasswordHash() == null
                 || !passwordEncoder.matches(request.password(), usuario.getPasswordHash())) {
-            auditarFalloLogin(usuario, "Contraseña inválida");
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
         if (!Boolean.TRUE.equals(usuario.getActivo())) {
-            auditarFalloLogin(usuario, "Cuenta desactivada");
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cuenta desactivada");
         }
         if (!Boolean.TRUE.equals(usuario.getEmailVerificado())) {
-            auditarFalloLogin(usuario, "Email no verificado");
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN, "Debe verificar su email antes de acceder");
+        }
+        // Un empleado desactivado (baja lógica) no puede iniciar sesión, aunque su cuenta siga activa.
+        if (Boolean.TRUE.equals(usuario.getEsUsuarioEmpleado())
+                && !Boolean.TRUE.equals(usuario.getActivoComoEmpleado())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Tu cuenta de empleado fue desactivada");
         }
         usuario.setUltimoAcceso(Instant.now());
         var token = tokenJwtServicio.generarToken(usuario);
@@ -113,20 +116,5 @@ public class CredencialesUsuarioService {
                 .descripcion("Inicio de sesión")
                 .build());
         return new AuthResponse(UsuarioResponse.from(usuario), token);
-    }
-
-    /**
-     * Audita un intento de login fallido de un usuario existente. Usa una transacción nueva
-     * ({@code REQUIRES_NEW}) porque a continuación se relanza la excepción y la transacción
-     * de login hace rollback; la fila de auditoría debe sobrevivir.
-     */
-    private void auditarFalloLogin(Usuario usuario, String motivo) {
-        auditoriaService.registrarIndependiente(AuditoriaEvento.builder()
-                .idUsuario(usuario.getId())
-                .tablaOrigen(TABLA_USUARIOS)
-                .idRegistro(usuario.getId())
-                .accion(AccionAuditoria.LOGIN_FALLIDO)
-                .descripcion(motivo)
-                .build());
     }
 }
