@@ -36,14 +36,14 @@ public class MateriaPrimaRestController {
 
     @GetMapping
     public List<MateriaPrimaResponse> listar(@PathVariable String idGranja) {
-        return materiaPrimaService.listarPorGranja(SecurityUtils.requireUserId(), idGranja);
+        return materiaPrimaService.listarPorGranja(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public MateriaPrimaResponse crear(
             @PathVariable String idGranja, @Valid @RequestBody MateriaPrimaRequest request) {
-        return materiaPrimaService.crear(SecurityUtils.requireUserId(), idGranja, request);
+        return materiaPrimaService.crear(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idMateriaPrima}")
@@ -52,20 +52,20 @@ public class MateriaPrimaRestController {
             @PathVariable Long idMateriaPrima,
             @Valid @RequestBody MateriaPrimaRequest request) {
         return materiaPrimaService.actualizar(
-                SecurityUtils.requireUserId(), idGranja, idMateriaPrima, request);
+                SecurityUtils.requireTenantId(), idGranja, idMateriaPrima, request);
     }
 
     @DeleteMapping("/{idMateriaPrima}")
     public ResponseEntity<Void> desactivar(
             @PathVariable String idGranja, @PathVariable Long idMateriaPrima) {
-        materiaPrimaService.desactivar(SecurityUtils.requireUserId(), idGranja, idMateriaPrima);
+        materiaPrimaService.desactivar(SecurityUtils.requireTenantId(), idGranja, idMateriaPrima);
         return ResponseEntity.noContent().build();
     }
 
     /** RF-MP-004 — exporta MPs activas a CSV (UTF-8, columnas: codigo,nombre,precio_por_kilo). */
     @GetMapping(value = "/csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable String idGranja) {
-        String csv = materiaPrimaService.exportarCsv(SecurityUtils.requireUserId(), idGranja);
+        String csv = materiaPrimaService.exportarCsv(SecurityUtils.requireTenantId(), idGranja);
         byte[] cuerpo = csv.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -83,7 +83,7 @@ public class MateriaPrimaRestController {
         }
         try {
             return materiaPrimaService.importarCsv(
-                    SecurityUtils.requireUserId(), idGranja, archivo.getInputStream());
+                    SecurityUtils.requireTenantId(), idGranja, archivo.getInputStream());
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "No se pudo leer el archivo: " + e.getMessage());

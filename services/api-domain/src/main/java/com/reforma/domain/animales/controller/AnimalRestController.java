@@ -42,14 +42,14 @@ public class AnimalRestController {
     public List<AnimalResponse> listar(
             @PathVariable String idGranja,
             @RequestParam(name = "buscar", required = false) String buscar) {
-        return animalService.listarPorGranja(SecurityUtils.requireUserId(), idGranja, buscar);
+        return animalService.listarPorGranja(SecurityUtils.requireTenantId(), idGranja, buscar);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AnimalResponse crear(
             @PathVariable String idGranja, @Valid @RequestBody AnimalRequest request) {
-        return animalService.crear(SecurityUtils.requireUserId(), idGranja, request);
+        return animalService.crear(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idAnimal}")
@@ -58,13 +58,13 @@ public class AnimalRestController {
             @PathVariable Long idAnimal,
             @Valid @RequestBody AnimalRequest request) {
         return animalService.actualizar(
-                SecurityUtils.requireUserId(), idGranja, idAnimal, request);
+                SecurityUtils.requireTenantId(), idGranja, idAnimal, request);
     }
 
     @DeleteMapping("/{idAnimal}")
     public ResponseEntity<Void> desactivar(
             @PathVariable String idGranja, @PathVariable Long idAnimal) {
-        animalService.desactivar(SecurityUtils.requireUserId(), idGranja, idAnimal);
+        animalService.desactivar(SecurityUtils.requireTenantId(), idGranja, idAnimal);
         return ResponseEntity.noContent().build();
     }
 
@@ -74,7 +74,7 @@ public class AnimalRestController {
      */
     @GetMapping(value = "/csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable String idGranja) {
-        String csv = animalService.exportarCsv(SecurityUtils.requireUserId(), idGranja);
+        String csv = animalService.exportarCsv(SecurityUtils.requireTenantId(), idGranja);
         byte[] cuerpo = csv.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -92,7 +92,7 @@ public class AnimalRestController {
         }
         try {
             return animalService.importarCsv(
-                    SecurityUtils.requireUserId(), idGranja, archivo.getInputStream());
+                    SecurityUtils.requireTenantId(), idGranja, archivo.getInputStream());
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "No se pudo leer el archivo: " + e.getMessage());

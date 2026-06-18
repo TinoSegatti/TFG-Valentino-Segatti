@@ -38,20 +38,20 @@ public class FormulaRestController {
 
     @GetMapping
     public List<FormulaResumenResponse> listar(@PathVariable String idGranja) {
-        return formulaService.listar(SecurityUtils.requireUserId(), idGranja);
+        return formulaService.listar(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idFormula}")
     public FormulaCompletaResponse obtener(
             @PathVariable String idGranja, @PathVariable String idFormula) {
-        return formulaService.obtener(SecurityUtils.requireUserId(), idGranja, idFormula);
+        return formulaService.obtener(SecurityUtils.requireTenantId(), idGranja, idFormula);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public FormulaCompletaResponse crearCabecera(
             @PathVariable String idGranja, @Valid @RequestBody FormulaCabeceraRequest request) {
-        return formulaService.crearCabecera(SecurityUtils.requireUserId(), idGranja, request);
+        return formulaService.crearCabecera(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idFormula}")
@@ -60,7 +60,7 @@ public class FormulaRestController {
             @PathVariable String idFormula,
             @Valid @RequestBody FormulaCabeceraRequest request) {
         return formulaService.actualizarCabecera(
-                SecurityUtils.requireUserId(), idGranja, idFormula, request);
+                SecurityUtils.requireTenantId(), idGranja, idFormula, request);
     }
 
     @PutMapping("/{idFormula}/detalle")
@@ -69,13 +69,13 @@ public class FormulaRestController {
             @PathVariable String idFormula,
             @Valid @RequestBody GuardarFormulaDetalleRequest request) {
         return formulaService.guardarDetalle(
-                SecurityUtils.requireUserId(), idGranja, idFormula, request);
+                SecurityUtils.requireTenantId(), idGranja, idFormula, request);
     }
 
     @DeleteMapping("/{idFormula}")
     public ResponseEntity<Void> desactivar(
             @PathVariable String idGranja, @PathVariable String idFormula) {
-        formulaService.desactivar(SecurityUtils.requireUserId(), idGranja, idFormula);
+        formulaService.desactivar(SecurityUtils.requireTenantId(), idGranja, idFormula);
         return ResponseEntity.noContent().build();
     }
 
@@ -86,7 +86,7 @@ public class FormulaRestController {
      */
     @GetMapping(value = "/csv", produces = "text/csv; charset=UTF-8")
     public ResponseEntity<byte[]> exportarCsv(@PathVariable String idGranja) {
-        String csv = formulaService.exportarCsv(SecurityUtils.requireUserId(), idGranja);
+        String csv = formulaService.exportarCsv(SecurityUtils.requireTenantId(), idGranja);
         byte[] cuerpo = csv.getBytes(StandardCharsets.UTF_8);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -109,7 +109,7 @@ public class FormulaRestController {
         }
         try {
             return formulaService.importarCsv(
-                    SecurityUtils.requireUserId(), idGranja, archivo.getInputStream());
+                    SecurityUtils.requireTenantId(), idGranja, archivo.getInputStream());
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "No se pudo leer el archivo: " + e.getMessage());

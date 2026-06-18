@@ -45,7 +45,8 @@ class FormulaRestControllerTest {
     @BeforeEach
     void autenticar() {
         var principal = new JwtUserPrincipal(
-                "u_demo", "demo@test.com", TipoUsuario.CLIENTE, PlanSuscripcion.DEMO, false);
+                "u_demo", "demo@test.com", TipoUsuario.CLIENTE, PlanSuscripcion.DEMO, false,
+                false, null, null);
         SecurityContextHolder.getContext()
                 .setAuthentication(new UsernamePasswordAuthenticationToken(principal, null, List.of()));
     }

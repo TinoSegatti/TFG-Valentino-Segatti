@@ -110,7 +110,8 @@ class AnimalRestControllerTest {
 
         var principal = new JwtUserPrincipal(
 
-                ID_USUARIO, "demo@reforma.local", TipoUsuario.CLIENTE, PlanSuscripcion.BUSINESS, true);
+                ID_USUARIO, "demo@reforma.local", TipoUsuario.CLIENTE, PlanSuscripcion.BUSINESS, true,
+                false, null, null);
 
         var auth = new UsernamePasswordAuthenticationToken(
 

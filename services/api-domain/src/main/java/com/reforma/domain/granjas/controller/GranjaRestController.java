@@ -25,17 +25,17 @@ public class GranjaRestController {
 
     @GetMapping
     public List<GranjaResponse> listar() {
-        return granjaAplicacionService.listarPorUsuario(SecurityUtils.requireUserId());
+        return granjaAplicacionService.listarPorUsuario(SecurityUtils.requireTenantId());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public GranjaResponse crear(@Valid @RequestBody GranjaRequest request) {
-        return granjaAplicacionService.crear(SecurityUtils.requireUserId(), request);
+        return granjaAplicacionService.crear(SecurityUtils.requireTenantId(), request);
     }
 
     @GetMapping("/{idGranja}")
     public GranjaResponse obtener(@PathVariable String idGranja) {
-        return granjaAplicacionService.obtener(SecurityUtils.requireUserId(), idGranja);
+        return granjaAplicacionService.obtener(SecurityUtils.requireTenantId(), idGranja);
     }
 }

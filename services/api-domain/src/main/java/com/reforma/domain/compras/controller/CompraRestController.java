@@ -30,20 +30,20 @@ public class CompraRestController {
 
     @GetMapping
     public List<CompraResumenResponse> listar(@PathVariable String idGranja) {
-        return compraService.listar(SecurityUtils.requireUserId(), idGranja);
+        return compraService.listar(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idCompra}")
     public CompraCompletaResponse obtener(
             @PathVariable String idGranja, @PathVariable String idCompra) {
-        return compraService.obtener(SecurityUtils.requireUserId(), idGranja, idCompra);
+        return compraService.obtener(SecurityUtils.requireTenantId(), idGranja, idCompra);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CompraCompletaResponse crearCabecera(
             @PathVariable String idGranja, @Valid @RequestBody CompraCabeceraRequest request) {
-        return compraService.crearCabecera(SecurityUtils.requireUserId(), idGranja, request);
+        return compraService.crearCabecera(SecurityUtils.requireTenantId(), idGranja, request);
     }
 
     @PutMapping("/{idCompra}")
@@ -52,13 +52,13 @@ public class CompraRestController {
             @PathVariable String idCompra,
             @Valid @RequestBody CompraCabeceraRequest request) {
         return compraService.actualizarCabecera(
-                SecurityUtils.requireUserId(), idGranja, idCompra, request);
+                SecurityUtils.requireTenantId(), idGranja, idCompra, request);
     }
 
     @DeleteMapping("/{idCompra}")
     public ResponseEntity<Void> eliminarCabecera(
             @PathVariable String idGranja, @PathVariable String idCompra) {
-        compraService.eliminarCabecera(SecurityUtils.requireUserId(), idGranja, idCompra);
+        compraService.eliminarCabecera(SecurityUtils.requireTenantId(), idGranja, idCompra);
         return ResponseEntity.noContent().build();
     }
 
@@ -68,6 +68,6 @@ public class CompraRestController {
             @PathVariable String idCompra,
             @Valid @RequestBody GuardarCompraDetalleRequest request) {
         return compraService.guardarDetalle(
-                SecurityUtils.requireUserId(), idGranja, idCompra, request);
+                SecurityUtils.requireTenantId(), idGranja, idCompra, request);
     }
 }
