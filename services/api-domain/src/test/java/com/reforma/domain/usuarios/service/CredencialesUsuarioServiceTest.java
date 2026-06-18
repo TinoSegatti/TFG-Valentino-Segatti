@@ -107,7 +107,7 @@ class CredencialesUsuarioServiceTest {
     }
 
     @Test
-    @DisplayName("login: contraseña inválida → 401 y auditoría LOGIN_FALLIDO en tx independiente")
+    @DisplayName("login: contraseña inválida → 401 sin auditar (no se almacenan logins fallidos)")
     void login_passwordInvalida() {
         var usuario = usuarioActivoVerificado();
         when(usuarioRepository.findByEmailIgnoreCase("u@reforma.com")).thenReturn(Optional.of(usuario));
@@ -118,14 +118,13 @@ class CredencialesUsuarioServiceTest {
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.UNAUTHORIZED));
 
-        verify(auditoriaService).registrarIndependiente(eventoCaptor.capture());
-        assertThat(eventoCaptor.getValue().accion()).isEqualTo(AccionAuditoria.LOGIN_FALLIDO);
+        verify(auditoriaService, never()).registrarIndependiente(any());
         verify(auditoriaService, never()).registrar(any());
         verify(tokenJwtServicio, never()).generarToken(any());
     }
 
     @Test
-    @DisplayName("login: email no verificado → 403 y auditoría LOGIN_FALLIDO")
+    @DisplayName("login: email no verificado → 403 sin auditar")
     void login_noVerificado() {
         var usuario = usuarioActivoVerificado();
         usuario.setEmailVerificado(false);
@@ -137,8 +136,27 @@ class CredencialesUsuarioServiceTest {
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.FORBIDDEN));
 
-        verify(auditoriaService).registrarIndependiente(eventoCaptor.capture());
-        assertThat(eventoCaptor.getValue().accion()).isEqualTo(AccionAuditoria.LOGIN_FALLIDO);
+        verify(auditoriaService, never()).registrarIndependiente(any());
+        verify(auditoriaService, never()).registrar(any());
+    }
+
+    @Test
+    @DisplayName("login: empleado desactivado → 403 sin auditar")
+    void login_empleadoDesactivado() {
+        var usuario = usuarioActivoVerificado();
+        usuario.setEsUsuarioEmpleado(true);
+        usuario.setActivoComoEmpleado(false);
+        when(usuarioRepository.findByEmailIgnoreCase("u@reforma.com")).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Clave123", "hash")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.iniciarSesion(new LoginRequest("u@reforma.com", "Clave123")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.FORBIDDEN));
+
+        verify(auditoriaService, never()).registrarIndependiente(any());
+        verify(auditoriaService, never()).registrar(any());
+        verify(tokenJwtServicio, never()).generarToken(any());
     }
 
     @Test
