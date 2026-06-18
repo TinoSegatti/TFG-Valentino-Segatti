@@ -24,7 +24,10 @@ public class PlanService {
 
     public int limiteGranjas(PlanSuscripcion plan) {
         return switch (plan) {
-            case DEMO, STARTER -> 1;
+            // DEMO habilita 2 granjas para que la cuenta de prueba pueda recorrer el flujo
+            // multi-granja sin upgrade (los datos se purgan a los 2 meses, ver LimpiezaCuentasDemoService).
+            // STARTER se mantiene >= DEMO para no dejar el plan pago por debajo de la prueba gratuita.
+            case DEMO, STARTER -> 2;
             case BUSINESS -> 3;
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
@@ -84,6 +87,19 @@ public class PlanService {
             case DEMO -> 5;
             case STARTER -> 50;
             case BUSINESS -> 500;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
+
+    /**
+     * RF-EMP-002: límite de cuentas de empleado vinculadas (activas) por plan efectivo del dueño.
+     * DEMO habilita 2 invitaciones para que la cuenta de prueba pueda recorrer el flujo de equipo
+     * (roles, multi-tenancy, revocación) sin upgrade; sus datos se purgan a los 2 meses.
+     */
+    public int limiteEmpleados(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO, STARTER -> 2;
+            case BUSINESS -> 10;
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
     }

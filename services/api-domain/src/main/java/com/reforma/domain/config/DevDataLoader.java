@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * Carga usuario demo en desarrollo (demo@reforma.local / Demo1234!).
+ * Carga la ÚNICA cuenta demo hardcodeada en desarrollo (demo@reforma.local / Demo1234!),
+ * BUSINESS con "Granja Demo". Idempotente: si la cuenta ya existe (p. ej. la sembró
+ * {@code scripts/seed.sh} con el mismo id {@code u_demo}), no hace nada.
  * Desactivar en producción usando perfil distinto de {@code dev}.
  */
 @Configuration
@@ -30,7 +32,8 @@ public class DevDataLoader {
     @Bean
     CommandLineRunner seedDemo() {
         return args -> {
-            if (usuarioRepository.findByEmailIgnoreCase("demo@reforma.local").isPresent()) {
+            if (usuarioRepository.findByEmailIgnoreCase("demo@reforma.local").isPresent()
+                    || usuarioRepository.findById("u_demo").isPresent()) {
                 return;
             }
             var usuario = Usuario.builder()
