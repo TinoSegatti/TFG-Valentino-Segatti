@@ -40,6 +40,12 @@ services:
       JWT_ML_SECRET: ${JWT_ML_SECRET}
       ML_BASE_URL: http://api-ml:8081
       FRONTEND_URL: http://localhost:4200
+      EMAIL_MODE: ${EMAIL_MODE:-log}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      EMAIL_FROM: ${EMAIL_FROM:-${SMTP_USER:-no-reply@reforma.local}}
     depends_on:
       postgres:
         condition: service_healthy
