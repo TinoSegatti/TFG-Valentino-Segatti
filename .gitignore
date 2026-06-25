@@ -13,6 +13,7 @@
 CONTEXTO_AGENTE_IA.md
 docs/MODULO_USUARIOS.md
 docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md
+docs/PRECIO_ALMACEN.md
 
 # --- Java / Maven (api-domain) ---
 services/api-domain/target/
