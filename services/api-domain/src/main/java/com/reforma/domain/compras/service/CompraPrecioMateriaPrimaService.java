@@ -55,6 +55,16 @@ public class CompraPrecioMateriaPrimaService {
         recalcularCatalogo(cabecera.getGranja().getId(), idsMateriasARecalcular);
     }
 
+    /**
+     * Tras eliminar (soft-delete) una compra, recalcula el catálogo de las materias afectadas.
+     *
+     * <p>Cuando la compra eliminada era la <strong>última (o única) compra REGISTRADA</strong> de una
+     * materia, ya no existe línea vigente que respalde el precio actual; en ese caso se revierte el
+     * precio de catálogo al {@code precioBaseManual} de la materia (el último precio cargado a mano),
+     * arrastrando el recálculo a fórmulas e inventario. Si aún quedan compras más recientes (p. ej.
+     * se borró una intermedia), el catálogo no cambia y el impacto queda acotado a inventario y costo
+     * de almacén.
+     */
     @Transactional
     public void aplicarTrasEliminarCompra(String idGranja, String idCompra, Collection<Long> idsMaterias) {
         registroPrecioRepository.deleteByCompra_Id(idCompra);
@@ -93,11 +103,12 @@ public class CompraPrecioMateriaPrimaService {
                         idGranja, idMateriaPrima, EstadoCompra.REGISTRADA, PageRequest.of(0, 1))
                 .stream()
                 .findFirst();
-        if (masReciente.isEmpty()) {
-            return;
-        }
-        double precioVigente = CompraCalculo.redondear(masReciente.get().getPrecioUnitario());
         materiaPrimaRepository.findById(idMateriaPrima).ifPresent(mp -> {
+            // Precio vigente = última compra registrada; si no quedan compras, vuelve al precio
+            // base manual de la materia (el último cargado a mano por el usuario).
+            double precioVigente = masReciente
+                    .map(linea -> CompraCalculo.redondear(linea.getPrecioUnitario()))
+                    .orElseGet(() -> CompraCalculo.redondear(mp.getPrecioBaseManual()));
             mp.setPrecioPorKilo(precioVigente);
             mp.setFechaUltimaActualizacion(Instant.now());
         });

@@ -292,7 +292,75 @@ class ComprasIntegracionIT {
         assertThat(historial).hasSize(2);
     }
 
+    @Test
+    @DisplayName("eliminarCabecera: borrar la única compra revierte el precio al base manual")
+    void eliminarCabecera_revierteAlPrecioBaseManual() {
+        // MAIZ se crea en seed() con precio base manual 3_000.125.
+        double precioBase = 3_000.125;
+
+        var cabecera = compraService.crearCabecera(
+                ID_USUARIO,
+                ID_GRANJA,
+                new CompraCabeceraRequest(idProveedor, "F-UNICA", LocalDate.of(2026, 6, 1), 10_000.0, null));
+        compraService.guardarDetalle(
+                ID_USUARIO,
+                ID_GRANJA,
+                cabecera.id(),
+                new GuardarCompraDetalleRequest(
+                        List.of(new CompraDetalleLineRequest(idMpMaiz, 10.0, 1_000.0, 10_000.0))));
+
+        // La compra fija el precio vigente de catálogo en 1.000.
+        assertThat(materiaPrimaRepository.findById(idMpMaiz).orElseThrow().getPrecioPorKilo())
+                .isEqualTo(1_000.0);
+
+        compraService.eliminarCabecera(ID_USUARIO, ID_GRANJA, cabecera.id());
+
+        // Al no quedar compras de MAIZ, el precio vuelve al base manual.
+        assertThat(materiaPrimaRepository.findById(idMpMaiz).orElseThrow().getPrecioPorKilo())
+                .isEqualTo(precioBase);
+    }
+
+    @Test
+    @DisplayName("eliminarCabecera: borrar una compra intermedia no cambia el precio vigente")
+    void eliminarCabecera_intermediaNoCambiaCatalogo() {
+        var cabeceraVieja = registrarCompraDevolviendoId(
+                "F-VIEJA", LocalDate.of(2026, 6, 1), idMpMaiz, 10.0, 100.0, 1_000.0);
+        var cabeceraMedia = registrarCompraDevolviendoId(
+                "F-MEDIA", LocalDate.of(2026, 6, 5), idMpMaiz, 10.0, 150.0, 1_500.0);
+        registrarCompra("F-RECIENTE", LocalDate.of(2026, 6, 10), idMpMaiz, 10.0, 200.0, 2_000.0);
+
+        // El precio vigente lo fija la compra más reciente (200).
+        assertThat(materiaPrimaRepository.findById(idMpMaiz).orElseThrow().getPrecioPorKilo())
+                .isEqualTo(200.0);
+
+        compraService.eliminarCabecera(ID_USUARIO, ID_GRANJA, cabeceraMedia);
+
+        // Borrar la intermedia no toca el catálogo: sigue mandando la más reciente (200).
+        assertThat(materiaPrimaRepository.findById(idMpMaiz).orElseThrow().getPrecioPorKilo())
+                .isEqualTo(200.0);
+
+        // Y borrar la más reciente sí baja el precio a la siguiente vigente (la vieja, 100).
+        var idReciente = compraCabeceraRepository
+                .findByGranjaIdAndActivoTrueOrderByFechaCompraDesc(ID_GRANJA)
+                .get(0)
+                .getId();
+        compraService.eliminarCabecera(ID_USUARIO, ID_GRANJA, idReciente);
+        assertThat(materiaPrimaRepository.findById(idMpMaiz).orElseThrow().getPrecioPorKilo())
+                .isEqualTo(100.0);
+        assertThat(cabeceraVieja).isNotBlank();
+    }
+
     private void registrarCompra(
+            String numeroFactura,
+            LocalDate fecha,
+            Long idMp,
+            double cantidad,
+            double precio,
+            double subtotal) {
+        registrarCompraDevolviendoId(numeroFactura, fecha, idMp, cantidad, precio, subtotal);
+    }
+
+    private String registrarCompraDevolviendoId(
             String numeroFactura,
             LocalDate fecha,
             Long idMp,
@@ -309,5 +377,6 @@ class ComprasIntegracionIT {
                 cabecera.id(),
                 new GuardarCompraDetalleRequest(
                         List.of(new CompraDetalleLineRequest(idMp, cantidad, precio, subtotal))));
+        return cabecera.id();
     }
 }

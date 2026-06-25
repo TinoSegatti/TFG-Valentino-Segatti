@@ -69,11 +69,13 @@ public class MateriaPrimaService {
         }
         Granja granja = granjaRepository.findById(idGranja).orElseThrow();
         Instant now = Instant.now();
+        double precio = request.precioPorKilo() != null ? request.precioPorKilo() : 0.0;
         MateriaPrima mp = MateriaPrima.builder()
                 .granja(granja)
                 .codigoMateriaPrima(codigo)
                 .nombreMateriaPrima(request.nombreMateriaPrima().trim())
-                .precioPorKilo(request.precioPorKilo() != null ? request.precioPorKilo() : 0.0)
+                .precioPorKilo(precio)
+                .precioBaseManual(precio)
                 .activa(true)
                 .fechaCreacion(now)
                 .fechaUltimaActualizacion(now)
@@ -98,7 +100,9 @@ public class MateriaPrimaService {
         mp.setCodigoMateriaPrima(nuevoCodigo);
         mp.setNombreMateriaPrima(request.nombreMateriaPrima().trim());
         if (request.precioPorKilo() != null) {
+            // Edición manual: actualiza tanto el precio vigente como la base de reversión.
             mp.setPrecioPorKilo(request.precioPorKilo());
+            mp.setPrecioBaseManual(request.precioPorKilo());
         }
         mp.setFechaUltimaActualizacion(Instant.now());
         return MateriaPrimaResponse.from(mp);
@@ -172,6 +176,7 @@ public class MateriaPrimaService {
                         .codigoMateriaPrima(codigo)
                         .nombreMateriaPrima(nombre)
                         .precioPorKilo(precio)
+                        .precioBaseManual(precio)
                         .activa(true)
                         .fechaCreacion(ahora)
                         .fechaUltimaActualizacion(ahora)
