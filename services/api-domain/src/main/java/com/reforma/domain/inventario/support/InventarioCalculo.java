@@ -25,11 +25,17 @@ public final class InventarioCalculo {
         return redondear(real * precioPorKilo);
     }
 
-    /** precio_almacen = SUM(cantidad x precio) / SUM(cantidad). Devuelve 0 si no hay kilos. */
-    public static double precioAlmacenPonderado(double totalDinero, double totalKilos) {
-        if (totalKilos <= 0.0) {
+    /**
+     * precio_almacen = gasto acumulado / kilos comprados acumulados (costo promedio ponderado).
+     *
+     * <p>El gasto acumulado es el valor del stock inicial (cantidad_inicial * precio_inicial) más la
+     * suma de subtotales de las compras REGISTRADAS; los kilos acumulados son la cantidad inicial más
+     * los kilos comprados. No interviene el consumo por fabricaciones. Devuelve 0 si no hay kilos.
+     */
+    public static double precioAlmacenPonderado(double gastoAcumulado, double kilosAcumulados) {
+        if (kilosAcumulados <= 0.0) {
             return 0.0;
         }
-        return redondear(totalDinero / totalKilos);
+        return redondear(gastoAcumulado / kilosAcumulados);
     }
 }

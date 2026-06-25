@@ -53,6 +53,7 @@ public class InventarioRecalculoService {
         double cantidadInicial = inicialOpt.map(InventarioInicial::getCantidadInicial).orElse(0.0);
         double precioInicial = inicialOpt.map(InventarioInicial::getPrecioInicial).orElse(0.0);
 
+        // Totales de compras REGISTRADAS y activas: SUM(cantidadComprada) y SUM(subtotal).
         CompraTotalesMateriaPrima totales = compraDetalleRepository.totalPorMateriaPrima(
                 idGranja, idMateriaPrima, EstadoCompra.REGISTRADA);
         double kilosCompras = totales != null ? totales.totalKilos() : 0.0;
@@ -64,10 +65,17 @@ public class InventarioRecalculoService {
                 .orElse(0.0);
         double cantidadSistema = InventarioCalculo.redondear(cantidadAcumulada - kilosUsadosFabricaciones);
 
-        double totalKilosPonderado = cantidadInicial + kilosCompras;
-        double totalDineroPonderado = (cantidadInicial * precioInicial) + dineroCompras;
-        double precioAlmacen =
-                InventarioCalculo.precioAlmacenPonderado(totalDineroPonderado, totalKilosPonderado);
+        // === PRECIO ALMACÉN: costo promedio ponderado de adquisición ===
+        // Se reconstruye desde cero en cada recálculo, por lo que editar o eliminar una factura queda
+        // reflejado automáticamente (los acumuladores se re-suman a partir de las líneas vigentes).
+        //
+        // Acumulador de gasto y de kilos comprados. La PRIMERA "iteración" del acumulador es el valor
+        // del stock inicial (cantidad_inicial * precio_inicial); a partir de ahí cada compra suma su
+        // subtotal y sus kilos. Las salidas por fabricación NO intervienen en este cálculo.
+        double gastoStockInicial = cantidadInicial * precioInicial;
+        double gastoAcumulado = gastoStockInicial + dineroCompras;
+        double kilosAcumulados = cantidadInicial + kilosCompras;
+        double precioAlmacen = InventarioCalculo.precioAlmacenPonderado(gastoAcumulado, kilosAcumulados);
         double precioVigente = mp.getPrecioPorKilo() != null ? mp.getPrecioPorKilo() : 0.0;
 
         Optional<Inventario> existenteOpt =
