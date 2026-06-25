@@ -34,10 +34,14 @@ public interface CompraDetalleRepository extends JpaRepository<CompraDetalle, St
     /**
      * Totales por materia prima en compras REGISTRADAS y activas de la granja.
      * Devuelve {@code [idMateriaPrima, totalKilos, totalDinero]} ordenado por MP.
+     *
+     * <p>El total de dinero acumula el {@code subtotal} guardado de cada línea (el gasto real de la
+     * factura), no {@code cantidad * precioUnitario}, para respetar la tolerancia de redondeo con la
+     * que el usuario carga el detalle de compra.
      */
     @Query(
             """
-            SELECT cd.materiaPrima.id, SUM(cd.cantidadComprada), SUM(cd.cantidadComprada * cd.precioUnitario)
+            SELECT cd.materiaPrima.id, SUM(cd.cantidadComprada), SUM(cd.subtotal)
             FROM CompraDetalle cd
             JOIN cd.compra c
             WHERE c.granja.id = :idGranja
@@ -48,12 +52,17 @@ public interface CompraDetalleRepository extends JpaRepository<CompraDetalle, St
     List<Object[]> sumarTotalesPorMateriaPrima(
             @Param("idGranja") String idGranja, @Param("estado") EstadoCompra estado);
 
-    /** Total {kilos, dinero} de compras REGISTRADAS para una MP. */
+    /**
+     * Total {kilos, dinero} de compras REGISTRADAS para una MP.
+     *
+     * <p>{@code totalDinero} suma el {@code subtotal} de cada línea (gasto real de la factura), base
+     * del acumulador de gasto del precio almacén; {@code totalKilos} suma {@code cantidadComprada}.
+     */
     @Query(
             """
             SELECT new com.reforma.domain.compras.support.CompraTotalesMateriaPrima(
                 COALESCE(SUM(cd.cantidadComprada), 0.0),
-                COALESCE(SUM(cd.cantidadComprada * cd.precioUnitario), 0.0)
+                COALESCE(SUM(cd.subtotal), 0.0)
             )
             FROM CompraDetalle cd
             JOIN cd.compra c
