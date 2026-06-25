@@ -11,63 +11,86 @@ import { hoyIsoFabricacion } from '../../../data/models/fabricacion.model';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <a [routerLink]="rutaDetalle()" class="back">← Volver al detalle</a>
-    <h2>Editar cabecera de fabricacion</h2>
+    <a [routerLink]="rutaDetalle()" class="reforma-back">
+      <i class="pi pi-arrow-left"></i> Volver al detalle
+    </a>
+    <h2 class="reforma-page-title">Editar cabecera de fabricación</h2>
 
     @if (cargando()) {
-      <p>Cargando…</p>
+      <p class="reforma-empty">Cargando…</p>
     } @else {
-      <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
-        <label>
-          Codigo
-          <input name="codigo" [(ngModel)]="codigoFabricacion" required maxlength="50" />
-        </label>
-        <label>
-          Fecha
-          <input type="date" name="fecha" [(ngModel)]="fechaFabricacion" [max]="hoy" required />
-        </label>
-        <label>
-          Descripcion
-          <input name="descripcion" [(ngModel)]="descripcionFabricacion" required maxlength="200" />
-        </label>
-        <label>
-          Observaciones
-          <input name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
-        </label>
-        <button type="submit" [disabled]="guardando() || f.invalid">Guardar</button>
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
-      </form>
+      <section class="reforma-section">
+        <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
+          <label class="reforma-field">
+            <span>Código</span>
+            <input class="reforma-input" name="codigo" [(ngModel)]="codigoFabricacion" required maxlength="50" />
+          </label>
+          <label class="reforma-field">
+            <span>Fecha</span>
+            <input class="reforma-input" type="date" name="fecha" [(ngModel)]="fechaFabricacion" [max]="hoy" required />
+          </label>
+          <label class="reforma-field full">
+            <span>Descripción</span>
+            <input class="reforma-input" name="descripcion" [(ngModel)]="descripcionFabricacion" required maxlength="200" />
+          </label>
+          <label class="reforma-field full">
+            <span>Observaciones</span>
+            <input class="reforma-input" name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
+          </label>
+
+          <div class="acciones">
+            <a [routerLink]="rutaDetalle()" class="reforma-btn-ghost">
+              <i class="pi pi-times"></i> Cancelar
+            </a>
+            <button class="reforma-btn" type="submit" [disabled]="guardando() || f.invalid">
+              <i class="pi pi-check"></i> Guardar
+            </button>
+          </div>
+          @if (error()) {
+            <p class="reforma-alert reforma-alert-error">
+              <i class="pi pi-exclamation-circle"></i> {{ error() }}
+            </p>
+          }
+        </form>
+      </section>
     }
   `,
   styles: [
     `
-      .back {
-        color: #166534;
+      :host {
+        display: block;
+        max-width: 64rem;
+      }
+      .reforma-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--reforma-accent);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+      .reforma-back:hover {
+        color: var(--reforma-text);
       }
       .formulario {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        max-width: 480px;
+        align-items: end;
       }
-      label {
+      .reforma-field.full {
+        grid-column: 1 / -1;
+      }
+      .acciones {
+        grid-column: 1 / -1;
         display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
       }
-      button[type='submit'] {
-        background: #166534;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-        align-self: flex-start;
-      }
-      .error {
-        color: #b91c1c;
+      .reforma-alert {
+        grid-column: 1 / -1;
       }
     `,
   ],

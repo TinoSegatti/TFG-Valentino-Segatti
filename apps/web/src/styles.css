@@ -1,1 +1,662 @@
-/* You can add global styles to this file, and also import other style files */
+/* ============================================================================
+   REFORMA — estilos globales y sistema de diseño "glassmorphism" (modo oscuro)
+   Stack: Tailwind CSS v4 + PrimeNG 19 (preset Aura tematizado a violeta) + tailwindcss-primeui.
+   Paleta y racional: ver DESIGN.md. Identidad: violeta #9d77f4 / cian #06b6d4 sobre #0a0a0f.
+   El orden de capas (theme, base, primeng, utilities) se define en providePrimeNG() (cssLayer).
+   ============================================================================ */
+
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+@plugin "tailwindcss-primeui";
+
+/* Modo oscuro permanente: clase .app-dark en <html> (ver index.html). */
+@custom-variant dark (&:where(.app-dark, .app-dark *));
+
+/* ----------------------------------------------------------------------------
+   Tokens de marca y de superficie glass
+   ---------------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  /* Marca: violeta (acción/selección/foco) + acentos rosa/cian. */
+  --reforma-accent: #9d77f4;
+  --reforma-accent-strong: #7c3aed;
+  --reforma-accent-soft: rgba(157, 119, 244, 0.16);
+  --reforma-accent-contrast: #0a0a0f;
+  --reforma-secondary: #f472b6;
+  --reforma-cyan: #06b6d4;
+
+  /* Texto (contraste verificado AA sobre #0a0a0f). */
+  --reforma-text: #f1f5f9;       /* cuerpo/títulos  ~15:1 */
+  --reforma-text-dim: #94a3b8;   /* secundario      ~7.5:1 */
+  --reforma-text-faint: #64748b; /* terciario (texto grande / no crítico) */
+
+  /* Superficies glass. */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  --glass-bg-hover: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.16);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), 0 2px 8px rgba(0, 0, 0, 0.20);
+  --glass-blur: 20px;
+
+  /* Superficie opaca para desplegables/paneles que deben leerse sí o sí. */
+  --opaque-surface: rgba(12, 16, 26, 0.98);
+
+  /* Semánticos. */
+  --reforma-danger: #f87171;
+  --reforma-warn: #fbbf24;
+  --reforma-ok: #34d399;
+  --reforma-info: #38bdf8;
+
+  --reforma-radius: 16px;
+
+  /* Tipografía de cifras (KPIs, gráficos) — Space Grotesk, como el handoff. */
+  --font-display: 'Space Grotesk', 'Hanken Grotesk', system-ui, sans-serif;
+}
+
+/* ----------------------------------------------------------------------------
+   Base de página
+   ---------------------------------------------------------------------------- */
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+html {
+  font-family: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  color: var(--reforma-text);
+  background: #0a0a0f;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+/* Scrollbar acorde al tema oscuro */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* ----------------------------------------------------------------------------
+   Overlays de fondo (fixed, detrás de todo el contenido) — dan profundidad.
+   Se montan una vez en app.component.
+   ---------------------------------------------------------------------------- */
+.app-bg-gradient {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 820px at 12% -8%, rgba(157, 119, 244, 0.16), transparent 52%),
+    radial-gradient(1000px 700px at 110% 12%, rgba(6, 182, 212, 0.12), transparent 50%),
+    radial-gradient(900px 900px at 50% 120%, rgba(244, 114, 182, 0.10), transparent 60%);
+}
+.app-bg-noise {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(157, 119, 244, 0.10) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* ----------------------------------------------------------------------------
+   Utilidades glass reutilizables (clases explícitas, sin @layer → alta prioridad)
+   ---------------------------------------------------------------------------- */
+.glass-surface {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--reforma-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.glass-card-strong {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--reforma-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(calc(var(--glass-blur) + 4px));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 4px));
+}
+
+/* Tarjeta interactiva (links/acciones): realce sutil al hover. */
+.glass-card-interactive {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.glass-card-interactive:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.38);
+  transform: translateY(-2px);
+}
+
+/* Texto auxiliar */
+.text-dim {
+  color: var(--reforma-text-dim);
+}
+.text-faint {
+  color: var(--reforma-text-faint);
+}
+
+/* ----------------------------------------------------------------------------
+   Controles base reutilizables (.reforma-*) para pantallas migradas.
+   ---------------------------------------------------------------------------- */
+.reforma-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.75rem;
+  color: var(--reforma-text);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.reforma-input::placeholder {
+  color: var(--reforma-text-faint);
+}
+.reforma-input:focus {
+  border-color: var(--reforma-accent);
+  box-shadow: 0 0 0 3px var(--reforma-accent-soft);
+}
+
+.reforma-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--reforma-accent-contrast);
+  background: linear-gradient(180deg, var(--reforma-accent), var(--reforma-accent-strong));
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+}
+.reforma-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 8px 24px rgba(157, 119, 244, 0.30);
+}
+.reforma-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.reforma-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reforma-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  color: var(--reforma-text);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.reforma-btn-ghost:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-strong);
+}
+
+/* Avisos / alertas (color + ícono + texto, no solo color) */
+.reforma-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+}
+.reforma-alert-error {
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+.reforma-alert-warn {
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.reforma-alert-ok {
+  color: #bbf7d0;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+/* ----------------------------------------------------------------------------
+   Scaffolding de páginas de datos (secciones, tablas, formularios) — compartido
+   ---------------------------------------------------------------------------- */
+
+/* Título de página */
+.reforma-page-title {
+  margin: 0 0 1.25rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--reforma-text);
+}
+
+/* Sección en tarjeta glass */
+.reforma-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--reforma-radius);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  padding: 1.25rem 1.5rem;
+}
+.reforma-section-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--reforma-text);
+}
+
+/* Campo de formulario (label + control en columna) */
+.reforma-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--reforma-text-dim);
+}
+.reforma-field > span,
+.reforma-field > label {
+  font-weight: 500;
+  color: var(--reforma-text-dim);
+}
+
+/* Tabla glass (legible sobre fondo oscuro) */
+.reforma-table-wrap {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--reforma-radius);
+  overflow: hidden;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.reforma-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.reforma-table thead th {
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+  font-weight: 600;
+  color: var(--reforma-text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--glass-border);
+  white-space: nowrap;
+}
+.reforma-table tbody td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--reforma-text);
+}
+.reforma-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.reforma-table tbody tr {
+  transition: background 0.12s ease;
+}
+.reforma-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+.reforma-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cabeceras ordenables: clic para ordenar asc/desc con indicador de flecha. */
+.reforma-table th.sortable,
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+th.sortable::after {
+  content: '\2195'; /* flecha doble: ordenable, sin dirección activa */
+  margin-left: 0.35rem;
+  font-size: 0.8em;
+  opacity: 0.35;
+}
+th.sortable.is-asc::after {
+  content: '\2191';
+  opacity: 0.95;
+}
+th.sortable.is-desc::after {
+  content: '\2193';
+  opacity: 0.95;
+}
+.reforma-table th.sortable:hover {
+  color: var(--reforma-text);
+}
+
+/* Botones auxiliares */
+.reforma-btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+.reforma-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.reforma-btn-danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+/* Estado vacío */
+.reforma-empty {
+  color: var(--reforma-text-faint);
+  padding: 1rem 0;
+}
+
+/* Código inline (ayudas de formato) */
+.reforma-code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--reforma-text);
+}
+
+/* Enlaces */
+a {
+  color: var(--reforma-accent);
+}
+
+/* ----------------------------------------------------------------------------
+   Toolbar de página (título + acción primaria a la derecha) — usado por
+   listados (Compras / Fórmulas / Fabricaciones) para que todos compartan layout.
+   ---------------------------------------------------------------------------- */
+.reforma-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.25rem;
+}
+.reforma-toolbar > .reforma-page-title,
+.reforma-toolbar > h2 {
+  margin: 0;
+}
+
+/* ----------------------------------------------------------------------------
+   Autocomplete con panel desplegable propio (input + <ul class="dropdown">).
+   Reemplaza los antiguos dropdowns blancos (background:white, hover:#ecfdf5)
+   por un panel oscuro consistente con el resto del tema.
+   ---------------------------------------------------------------------------- */
+.reforma-autocomplete {
+  position: relative;
+}
+.reforma-autocomplete-panel,
+.reforma-autocomplete .dropdown {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--opaque-surface);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: var(--glass-shadow);
+  color: var(--reforma-text);
+}
+.reforma-autocomplete-panel li,
+.reforma-autocomplete .dropdown li {
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--reforma-text);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.reforma-autocomplete-panel li:hover,
+.reforma-autocomplete .dropdown li:hover {
+  background: var(--reforma-accent-soft);
+  color: #ede9fe;
+}
+
+/* ----------------------------------------------------------------------------
+   PrimeNG <p-select> overlay — fuerza el panel desplegable al tema oscuro
+   y le da ancho razonable cuando se usa dentro de tablas (rol del empleado).
+   El selector apunta al overlay global, válido para PrimeNG 19 con appendTo="body".
+   ---------------------------------------------------------------------------- */
+.p-select,
+.p-select .p-select-label {
+  color: var(--reforma-text);
+}
+.p-select-overlay,
+.p-select-panel {
+  background: var(--opaque-surface) !important;
+  border: 1px solid var(--glass-border-strong) !important;
+  color: var(--reforma-text) !important;
+  box-shadow: var(--glass-shadow);
+  min-width: 12rem;
+}
+.p-select-overlay .p-select-list,
+.p-select-panel .p-select-items {
+  background: transparent !important;
+  padding: 0.25rem;
+}
+.p-select-overlay .p-select-option,
+.p-select-panel .p-select-item {
+  color: var(--reforma-text) !important;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  white-space: normal;          /* deja que el label de Rol respire */
+  line-height: 1.3;
+}
+.p-select-overlay .p-select-option:hover,
+.p-select-overlay .p-select-option.p-focus,
+.p-select-panel .p-select-item:hover,
+.p-select-panel .p-select-item.p-focus {
+  background: var(--reforma-accent-soft) !important;
+  color: #ede9fe !important;
+}
+.p-select-overlay .p-select-option.p-select-option-selected,
+.p-select-panel .p-select-item.p-highlight {
+  background: var(--reforma-accent-soft) !important;
+  color: #ede9fe !important;
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------------------
+   Paneles de visualización (KPIs + gráficos) — distribución estilo handoff.
+   Cada módulo antepone una sección con estas utilidades. Ver design_handoff.
+   ---------------------------------------------------------------------------- */
+
+/* Cifras grandes (KPIs / valores de gráfico): Space Grotesk + tabular-nums. */
+.rf-num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Contenedor de panel (separación respecto al CRUD que va debajo). */
+.rf-panel {
+  margin: 0 0 1.75rem;
+}
+
+/* Fila de KPIs: 4 → 2 → 1. gap 18px como el handoff. */
+.rf-grid-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+/* Filas de gráficos del handoff. */
+.rf-grid-2 {
+  display: grid;
+  grid-template-columns: 1.65fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+  align-items: stretch;
+}
+.rf-grid-1-2 {
+  display: grid;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 18px;
+  margin-bottom: 18px;
+  align-items: stretch;
+}
+.rf-grid-halves {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .rf-grid-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .rf-grid-2,
+  .rf-grid-1-2,
+  .rf-grid-halves {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 560px) {
+  .rf-grid-kpis {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   Animaciones de entrada (handoff): rise (tarjetas), grow/growX (barras),
+   draw (líneas/donuts SVG), pulse (punto notificaciones).
+   El escalonado usa la variable --rf-i (índice) en cada elemento.
+   ---------------------------------------------------------------------------- */
+@keyframes rf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes rf-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes rf-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes rf-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes rf-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.35;
+  }
+}
+
+/* Entrada escalonada de tarjetas. El padre setea --rf-i por índice. */
+.rf-rise {
+  opacity: 0;
+  animation: rf-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--rf-i, 0) * 0.08s);
+}
+
+/* Barra horizontal de progreso (growX desde la izquierda). */
+.rf-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--glass-bg-strong);
+  overflow: hidden;
+}
+.rf-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--reforma-accent), var(--reforma-cyan));
+  transform-origin: left;
+  animation: rf-grow-x 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Accesibilidad: respetar reduced-motion globalmente. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

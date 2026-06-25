@@ -11,23 +11,25 @@ import { Animal } from '../../../data/models/animal.model';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <a routerLink=".." class="back">← Volver al listado</a>
-    <h2>Nueva formula</h2>
+    <a routerLink=".." class="reforma-back"><i class="pi pi-arrow-left"></i> Volver al listado</a>
+    <h2 class="reforma-page-title">Nueva fórmula</h2>
     <p class="subtitulo">Completá los datos; luego cargarás los ingredientes (1000 kg).</p>
 
-    <form (ngSubmit)="crear()" #f="ngForm" class="formulario">
-      <label>
-        Codigo de formula
-        <input name="codigo" [(ngModel)]="codigoFormula" maxlength="50" required />
-      </label>
-      <label>
-        Descripcion
-        <input name="descripcion" [(ngModel)]="descripcionFormula" maxlength="200" required />
-      </label>
-      <div class="fila-animal">
-        <label class="autocomplete">
-          Animal
+    <section class="reforma-section">
+      <form (ngSubmit)="crear()" #f="ngForm" class="formulario">
+        <label class="reforma-field">
+          <span>Código de fórmula</span>
+          <input class="reforma-input" name="codigo" [(ngModel)]="codigoFormula" maxlength="50" required />
+        </label>
+        <label class="reforma-field">
+          <span>Descripción</span>
+          <input class="reforma-input" name="descripcion" [(ngModel)]="descripcionFormula" maxlength="200" required />
+        </label>
+
+        <label class="reforma-field reforma-autocomplete">
+          <span>Animal</span>
           <input
+            class="reforma-input"
             name="animal"
             [(ngModel)]="nombreAnimal"
             (ngModelChange)="onNombreAnimalChange($event)"
@@ -45,115 +47,68 @@ import { Animal } from '../../../data/models/animal.model';
             </ul>
           }
         </label>
-        <label>
-          Codigo animal
+        <label class="reforma-field">
+          <span>Código animal</span>
           <input
+            class="reforma-input"
             name="codigoAnimal"
             [(ngModel)]="codigoAnimal"
             (ngModelChange)="onCodigoAnimalChange($event)"
             required
           />
         </label>
-      </div>
 
-      <div class="acciones-form">
-        <button type="submit" [disabled]="guardando() || f.invalid || !idAnimalSeleccionado()">
-          Guardar e ir a ingredientes
-        </button>
-        <a routerLink=".." class="btn-cancelar">Cancelar</a>
-      </div>
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-    </form>
+        <div class="acciones">
+          <a routerLink=".." class="reforma-btn-ghost"><i class="pi pi-times"></i> Cancelar</a>
+          <button class="reforma-btn" type="submit" [disabled]="guardando() || f.invalid || !idAnimalSeleccionado()">
+            <i class="pi pi-check"></i> Guardar e ir a ingredientes
+          </button>
+        </div>
+        @if (error()) {
+          <p class="reforma-alert reforma-alert-error">
+            <i class="pi pi-exclamation-circle"></i> {{ error() }}
+          </p>
+        }
+      </form>
+    </section>
   `,
   styles: [
     `
       :host {
         display: block;
-        max-width: 900px;
+        max-width: 64rem;
       }
-      .back {
-        color: #166534;
+      .reforma-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--reforma-accent);
         text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+      .reforma-back:hover {
+        color: var(--reforma-text);
       }
       .subtitulo {
-        color: #6b7280;
+        color: var(--reforma-text-dim);
+        margin: 0 0 1.25rem;
       }
       .formulario {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        padding: 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #fafafa;
+        align-items: end;
       }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        font-size: 0.85rem;
-      }
-      .fila-animal {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        width: 100%;
-      }
-      .autocomplete {
-        position: relative;
-        flex: 1;
-        min-width: 200px;
-      }
-      input {
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-      }
-      .dropdown {
-        position: absolute;
-        z-index: 10;
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        background: white;
-        border: 1px solid #d1d5db;
-        max-height: 200px;
-        overflow-y: auto;
-        width: 100%;
-      }
-      .dropdown li {
-        padding: 0.5rem;
-        cursor: pointer;
-      }
-      .dropdown li:hover {
-        background: #ecfdf5;
-      }
-      button {
-        padding: 0.5rem 1rem;
-        background: #166534;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.5;
-      }
-      .btn-cancelar {
-        color: #374151;
-        text-decoration: none;
-        padding: 0.5rem 1rem;
-      }
-      .acciones-form {
+      .acciones {
+        grid-column: 1 / -1;
         display: flex;
         gap: 0.75rem;
-        width: 100%;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
       }
-      .error {
-        color: #b91c1c;
-        width: 100%;
+      .reforma-alert {
+        grid-column: 1 / -1;
       }
     `,
   ],

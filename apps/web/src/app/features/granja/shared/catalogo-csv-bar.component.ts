@@ -18,33 +18,41 @@ import { CsvImportResult } from '../../../data/models/csv.model';
   selector: 'app-catalogo-csv-bar',
   standalone: true,
   template: `
-    <section class="csv-bar">
+    <section class="csv-bar glass-surface">
+      <div class="head">
+        <i class="pi pi-file-import"></i>
+        <span>Importar / exportar CSV</span>
+      </div>
+
       <div class="acciones">
         <button
           type="button"
-          class="csv"
+          class="reforma-btn-ghost reforma-btn-sm"
           [disabled]="trabajando"
           (click)="exportar.emit()"
         >
-          Exportar CSV
+          <i class="pi pi-download"></i> Exportar CSV
         </button>
 
-        <label class="archivo">
+        <label class="archivo reforma-btn-ghost reforma-btn-sm">
+          <i class="pi pi-paperclip"></i>
+          <span>{{ archivo() ? 'Cambiar archivo' : 'Elegir archivo' }}</span>
           <input
             type="file"
             accept=".csv,text/csv"
             (change)="onArchivoSeleccionado($event)"
             [disabled]="trabajando"
+            hidden
           />
         </label>
 
         <button
           type="button"
-          class="csv"
+          class="reforma-btn reforma-btn-sm"
           [disabled]="trabajando || !archivo()"
           (click)="onImportar()"
         >
-          Importar CSV
+          <i class="pi pi-upload"></i> Importar CSV
         </button>
 
         @if (archivo()) {
@@ -55,37 +63,40 @@ import { CsvImportResult } from '../../../data/models/csv.model';
       </div>
 
       <p class="ayuda">
-        Formato esperado: CSV UTF-8 con cabecera <code>{{ columnasAyuda }}</code>. Las filas
-        duplicadas o inválidas se reportan abajo sin abortar el resto de la importación.
+        Formato esperado: CSV UTF-8 con cabecera <code class="reforma-code">{{ columnasAyuda }}</code>.
+        Las filas duplicadas o inválidas se reportan abajo sin abortar el resto de la importación.
       </p>
 
       @if (resultado) {
         <div
-          class="resumen"
-          [class.ok]="resultado.filasError === 0 && resultado.filasOk > 0"
-          [class.alerta]="resultado.filasError > 0"
+          class="reforma-alert resumen"
+          [class.reforma-alert-ok]="resultado.filasError === 0 && resultado.filasOk > 0"
+          [class.reforma-alert-warn]="resultado.filasError > 0"
         >
-          <strong>Resultado del último import:</strong>
-          {{ resultado.filasOk }} fila{{ resultado.filasOk === 1 ? '' : 's' }} importada{{
-            resultado.filasOk === 1 ? '' : 's'
-          }}, {{ resultado.filasError }} con error.
+          <div>
+            <i class="pi" [class.pi-check-circle]="resultado.filasError === 0" [class.pi-exclamation-triangle]="resultado.filasError > 0"></i>
+            <strong>Resultado del último import:</strong>
+            {{ resultado.filasOk }} fila{{ resultado.filasOk === 1 ? '' : 's' }} importada{{
+              resultado.filasOk === 1 ? '' : 's'
+            }}, {{ resultado.filasError }} con error.
 
-          @if (resultado.errores.length > 0) {
-            <details class="errores">
-              <summary>Ver {{ resultado.errores.length }} detalle(s)</summary>
-              <ul>
-                @for (e of resultado.errores; track $index) {
-                  <li>
-                    Línea {{ e.linea }}
-                    @if (e.codigo) {
-                      (<code>{{ e.codigo }}</code>)
-                    }
-                    — {{ e.mensaje }}
-                  </li>
-                }
-              </ul>
-            </details>
-          }
+            @if (resultado.errores.length > 0) {
+              <details class="errores">
+                <summary>Ver {{ resultado.errores.length }} detalle(s)</summary>
+                <ul>
+                  @for (e of resultado.errores; track $index) {
+                    <li>
+                      Línea {{ e.linea }}
+                      @if (e.codigo) {
+                        (<code class="reforma-code">{{ e.codigo }}</code>)
+                      }
+                      — {{ e.mensaje }}
+                    </li>
+                  }
+                </ul>
+              </details>
+            }
+          </div>
         </div>
       }
     </section>
@@ -97,70 +108,54 @@ import { CsvImportResult } from '../../../data/models/csv.model';
         margin: 1.5rem 0;
       }
       .csv-bar {
-        padding: 0.75rem 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #f9fafb;
+        padding: 1rem 1.25rem;
+        border-radius: var(--reforma-radius);
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+        font-weight: 600;
+        color: var(--reforma-text);
+      }
+      .head i {
+        color: var(--reforma-accent);
       }
       .acciones {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.75rem;
+        gap: 0.6rem;
         align-items: center;
       }
-      button.csv {
-        padding: 0.45rem 0.9rem;
-        background: #1d4ed8;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.9rem;
-      }
-      button.csv:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-      }
-      .archivo input[type='file'] {
-        font-size: 0.85rem;
+      .archivo {
+        margin: 0;
       }
       .archivo-nombre {
-        font-size: 0.8rem;
-        color: #374151;
+        font-size: 0.82rem;
+        color: var(--reforma-text-dim);
         max-width: 240px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
       .ayuda {
-        margin: 0.6rem 0 0;
-        font-size: 0.8rem;
-        color: #6b7280;
-      }
-      code {
-        background: #e5e7eb;
-        padding: 0 0.3rem;
-        border-radius: 3px;
-        font-size: 0.78rem;
+        margin: 0.75rem 0 0;
+        font-size: 0.82rem;
+        color: var(--reforma-text-dim);
       }
       .resumen {
-        margin-top: 0.75rem;
-        padding: 0.6rem 0.75rem;
-        border-radius: 4px;
-        font-size: 0.88rem;
+        margin-top: 0.85rem;
+        display: block;
       }
-      .resumen.ok {
-        background: #ecfdf5;
-        border: 1px solid #6ee7b7;
-        color: #065f46;
-      }
-      .resumen.alerta {
-        background: #fef3c7;
-        border: 1px solid #fcd34d;
-        color: #92400e;
+      .resumen i {
+        margin-right: 0.35rem;
       }
       .errores {
         margin-top: 0.5rem;
+      }
+      .errores summary {
+        cursor: pointer;
       }
       .errores ul {
         margin: 0.4rem 0 0 1.2rem;
@@ -168,7 +163,6 @@ import { CsvImportResult } from '../../../data/models/csv.model';
       }
       .errores li {
         margin-bottom: 0.25rem;
-        color: #b91c1c;
       }
     `,
   ],
