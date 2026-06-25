@@ -24,8 +24,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -187,6 +189,7 @@ public class CompraService {
     private List<CompraDetalle> construirLineasValidadas(
             String idGranja, CompraCabecera cabecera, List<CompraDetalleLineRequest> lineasRequest) {
         List<CompraDetalle> nuevasLineas = new ArrayList<>();
+        Set<Long> materiasVistas = new HashSet<>();
 
         for (CompraDetalleLineRequest linea : lineasRequest) {
             MateriaPrima mp = materiaPrimaRepository
@@ -195,6 +198,14 @@ public class CompraService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "Materia prima no válida o inactiva: id=" + linea.idMateriaPrima()));
+
+            if (!materiasVistas.add(linea.idMateriaPrima())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "La materia prima "
+                                + mp.getCodigoMateriaPrima()
+                                + " está repetida en el detalle: cada materia prima debe figurar una sola vez");
+            }
 
             double cantidad = CompraCalculo.redondear(linea.cantidadKg());
             double precio = CompraCalculo.redondear(linea.precioPorKilo());
