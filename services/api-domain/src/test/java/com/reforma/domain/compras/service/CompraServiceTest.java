@@ -202,23 +202,55 @@ class CompraServiceTest {
     }
 
     @Test
-    @DisplayName("guardarDetalle: acepta factura 30M con múltiples líneas")
+    @DisplayName("guardarDetalle: acepta factura 30M con múltiples líneas de materias distintas")
     void guardarDetalle_factura30Millones() {
         CompraCabecera cabecera = cabeceraBorrador(30_000_000.0);
+        MateriaPrima soja = MateriaPrima.builder()
+                .id(11L)
+                .granja(granja)
+                .codigoMateriaPrima("SOJA")
+                .nombreMateriaPrima("Soja")
+                .precioPorKilo(200.0)
+                .activa(true)
+                .fechaCreacion(Instant.now())
+                .fechaUltimaActualizacion(Instant.now())
+                .build();
         when(compraCabeceraRepository.findByIdAndGranjaIdAndActivoTrue(ID_COMPRA, ID_GRANJA))
                 .thenReturn(Optional.of(cabecera));
         when(materiaPrimaRepository.findByIdAndGranjaId(10L, ID_GRANJA))
                 .thenReturn(Optional.of(materiaPrima));
+        when(materiaPrimaRepository.findByIdAndGranjaId(11L, ID_GRANJA))
+                .thenReturn(Optional.of(soja));
 
         var request = new GuardarCompraDetalleRequest(List.of(
                 new CompraDetalleLineRequest(10L, 5_000.0, 3_000.0, 15_000_000.0),
-                new CompraDetalleLineRequest(10L, 6_000.0, 2_500.0, 15_000_000.0)));
+                new CompraDetalleLineRequest(11L, 6_000.0, 2_500.0, 15_000_000.0)));
 
         CompraCompletaResponse response =
                 compraService.guardarDetalle(ID_USUARIO, ID_GRANJA, ID_COMPRA, request);
 
         assertThat(response.estado()).isEqualTo(EstadoCompra.REGISTRADA);
         assertThat(response.lineas()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("guardarDetalle: rechaza materia prima repetida en el detalle")
+    void guardarDetalle_materiaPrimaDuplicada() {
+        CompraCabecera cabecera = cabeceraBorrador(2_000.0);
+        when(compraCabeceraRepository.findByIdAndGranjaIdAndActivoTrue(ID_COMPRA, ID_GRANJA))
+                .thenReturn(Optional.of(cabecera));
+        when(materiaPrimaRepository.findByIdAndGranjaId(10L, ID_GRANJA))
+                .thenReturn(Optional.of(materiaPrima));
+
+        var request = new GuardarCompraDetalleRequest(List.of(
+                new CompraDetalleLineRequest(10L, 10.0, 100.0, 1_000.0),
+                new CompraDetalleLineRequest(10L, 10.0, 100.0, 1_000.0)));
+
+        assertThatThrownBy(() ->
+                        compraService.guardarDetalle(ID_USUARIO, ID_GRANJA, ID_COMPRA, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
     @Test
