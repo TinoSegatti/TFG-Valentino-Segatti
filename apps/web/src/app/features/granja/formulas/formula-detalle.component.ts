@@ -19,6 +19,7 @@ import {
   sumaKgCompleta,
 } from '../../../data/models/formula.model';
 import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
   selector: 'app-formula-detalle',
@@ -159,15 +160,15 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <table class="tabla-vista">
               <thead>
                 <tr>
-                  <th>Codigo MP</th>
-                  <th>Materia prima</th>
-                  <th>Cantidad (kg)</th>
-                  <th>Precio/kg</th>
-                  <th>Subtotal</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Codigo MP</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('nombre')" [class.is-desc]="orden.esDesc('nombre')" (click)="orden.alternar('nombre')">Materia prima</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('cantidad')" [class.is-desc]="orden.esDesc('cantidad')" (click)="orden.alternar('cantidad')">Cantidad (kg)</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('precio')" [class.is-desc]="orden.esDesc('precio')" (click)="orden.alternar('precio')">Precio/kg</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('subtotal')" [class.is-desc]="orden.esDesc('subtotal')" (click)="orden.alternar('subtotal')">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
-                @for (linea of lineas(); track $index) {
+                @for (linea of lineasOrdenadas(); track $index) {
                   <tr>
                     <td>{{ linea.codigo }}</td>
                     <td>{{ linea.nombre }}</td>
@@ -253,6 +254,9 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
               </label>
               <button type="button" class="danger" (click)="quitarLinea(i)">Quitar</button>
             </div>
+            @if (linea.advertenciaLinea) {
+              <p class="warn-linea">⚠ {{ linea.advertenciaLinea }}</p>
+            }
           }
 
           <button type="button" class="btn-secundario" (click)="agregarLinea()">
@@ -300,51 +304,70 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
         margin-bottom: 0.5rem;
       }
       .formulario-cabecera {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
         gap: 1rem;
       }
       .formulario-cabecera label {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.35rem;
         font-size: 0.85rem;
-        min-width: 180px;
+        color: var(--reforma-text-dim);
       }
       .autocomplete {
         position: relative;
-        min-width: 220px;
       }
       .dropdown {
         position: absolute;
-        z-index: 10;
+        z-index: 30;
         top: 100%;
         left: 0;
         right: 0;
-        margin: 0;
-        padding: 0;
+        margin: 0.25rem 0 0;
+        padding: 0.25rem;
         list-style: none;
-        background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        max-height: 180px;
+        background: var(--opaque-surface);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        max-height: 240px;
         overflow-y: auto;
+        box-shadow: var(--glass-shadow);
+        color: var(--reforma-text);
       }
       .dropdown li {
-        padding: 0.4rem 0.55rem;
+        padding: 0.5rem 0.7rem;
+        border-radius: 8px;
         cursor: pointer;
+        color: var(--reforma-text);
       }
       .dropdown li:hover {
-        background: #ecfdf5;
+        background: var(--reforma-accent-soft);
+        color: #ede9fe;
       }
-      input {
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        min-width: 100px;
+      input,
+      input[type='number'],
+      input[type='date'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.6rem 0.75rem;
+        color: var(--reforma-text);
+        background: var(--glass-bg-strong);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      input::placeholder {
+        color: var(--reforma-text-faint);
+      }
+      input:focus {
+        border-color: var(--reforma-accent);
+        box-shadow: 0 0 0 3px var(--reforma-accent-soft);
       }
       input[readonly] {
-        background: #f3f4f6;
+        background: var(--glass-bg);
+        color: var(--reforma-text-dim);
       }
       .tabla-vista {
         width: 100%;
@@ -353,69 +376,95 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
       }
       .tabla-vista th,
       .tabla-vista td {
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #e5e7eb;
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--glass-border);
         text-align: left;
+        color: var(--reforma-text);
       }
       .tabla-vista th {
-        font-size: 0.75rem;
-        color: #6b7280;
+        font-size: 0.78rem;
+        color: var(--reforma-text-dim);
         font-weight: 600;
+        background: rgba(255, 255, 255, 0.04);
       }
       .linea {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
         gap: 0.75rem;
-        align-items: flex-end;
+        align-items: end;
         padding: 1rem 0;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid var(--glass-border);
       }
       .mp-autocomplete {
-        display: flex;
-        flex-wrap: wrap;
+        grid-column: span 2;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
         gap: 0.75rem;
       }
       .linea label {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.35rem;
         font-size: 0.85rem;
+        color: var(--reforma-text-dim);
       }
       .totales,
       .totales-vista {
         margin-top: 1rem;
         padding-top: 1rem;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--glass-border);
+        color: var(--reforma-text-dim);
+      }
+      .totales strong,
+      .totales-vista strong {
+        color: var(--reforma-text);
       }
       .btn-secundario,
       button.danger {
-        padding: 0.45rem 0.9rem;
-        border: none;
-        border-radius: 4px;
+        padding: 0.5rem 0.9rem;
+        border-radius: 8px;
         cursor: pointer;
+        font: inherit;
         font-size: 0.85rem;
+        font-weight: 600;
+        transition: filter 0.12s ease, background 0.12s ease, border-color 0.12s ease;
       }
       .btn-secundario {
-        background: #374151;
-        color: white;
+        color: var(--reforma-text);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
         margin-top: 0.75rem;
       }
+      .btn-secundario:hover:not(:disabled) {
+        background: var(--glass-bg-hover);
+        border-color: var(--glass-border-strong);
+      }
       button.danger {
-        background: #b91c1c;
-        color: white;
+        color: #fecaca;
+        background: rgba(248, 113, 113, 0.12);
+        border: 1px solid rgba(248, 113, 113, 0.35);
+      }
+      button.danger:hover:not(:disabled) {
+        background: rgba(248, 113, 113, 0.2);
+        border-color: rgba(248, 113, 113, 0.55);
       }
       .warn {
-        color: #b45309;
+        color: #fde68a;
         font-weight: 600;
       }
+      .warn-linea {
+        margin: 0.25rem 0 0.5rem;
+        color: #fde68a;
+        font-size: 0.82rem;
+      }
       .ok-hint {
-        color: #166534;
+        color: #bbf7d0;
       }
       .ok {
-        color: #166534;
+        color: #bbf7d0;
       }
       .bad {
-        color: #b91c1c;
+        color: #fecaca;
       }
     `,
   ],
@@ -428,6 +477,16 @@ export class FormulaDetalleComponent implements OnInit {
 
   readonly formula = signal<FormulaCompleta | null>(null);
   readonly lineas = signal<LineaFormulaUi[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly lineasOrdenadas = computed(() =>
+    this.orden.ordenar(this.lineas(), {
+      codigo: (l) => l.codigo,
+      nombre: (l) => l.nombre,
+      cantidad: (l) => l.cantidadKg,
+      precio: (l) => l.precioPorKilo,
+      subtotal: (l) => l.costoParcial,
+    }),
+  );
   readonly materiasPrimas = signal<MateriaPrima[]>([]);
   readonly animales = signal<Animal[]>([]);
   readonly mpAbiertoIndex = signal<number | null>(null);
@@ -482,11 +541,7 @@ export class FormulaDetalleComponent implements OnInit {
   });
 
   readonly puedeGuardarDetalle = computed(() => {
-    return (
-      this.loteCompleto() &&
-      this.lineasConMateria().length > 0 &&
-      this.lineasConMateria().every((l) => l.precioPorKilo > 0)
-    );
+    return this.loteCompleto() && this.lineasConMateria().length > 0;
   });
 
   private get idGranja(): string {

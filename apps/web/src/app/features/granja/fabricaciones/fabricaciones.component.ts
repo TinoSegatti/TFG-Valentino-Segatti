@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -9,40 +9,88 @@ import {
   FabricacionResumen,
   textoConfirmacionEliminarFabricacion,
 } from '../../../data/models/fabricacion.model';
+import { KpiCardComponent } from '../shared/kpi-card.component';
+import { ChartCardComponent } from '../shared/chart-card.component';
+import { ApexChartComponent } from '../shared/apex-chart.component';
+import { barChart } from '../shared/apex-charts';
+import { sumarPorMes } from '../shared/panel-utils';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
   selector: 'app-fabricaciones',
   standalone: true,
-  imports: [FormsModule, RouterLink, DecimalPipe, DatePipe],
+  imports: [
+    FormsModule,
+    RouterLink,
+    DecimalPipe,
+    DatePipe,
+    KpiCardComponent,
+    ChartCardComponent,
+    ApexChartComponent,
+  ],
   template: `
-    <header class="toolbar">
-      <h2>Fabricaciones</h2>
-      <a routerLink="nueva" class="btn-nueva">Nueva fabricacion</a>
+    <header class="reforma-toolbar">
+      <h2 class="reforma-page-title">Fabricaciones</h2>
+      <a routerLink="nueva" class="reforma-btn"><i class="pi pi-plus"></i> Nueva fabricación</a>
     </header>
 
+    <section class="rf-grid-kpis">
+      <reforma-kpi-card style="--rf-i: 0" icon="pi-cog" label="Fabricaciones" [value]="stats().total | number: '1.0-0'" />
+      <reforma-kpi-card style="--rf-i: 1" icon="pi-database" label="Kilos producidos" [value]="(stats().kilos | number: '1.0-0') + ' kg'" accent="#06b6d4" [spark]="produccionMensual().valores" />
+      <reforma-kpi-card style="--rf-i: 2" icon="pi-dollar" label="Costo total" [value]="'$ ' + (stats().costo | number: '1.0-0')" accent="#f472b6" />
+      <reforma-kpi-card style="--rf-i: 3" icon="pi-calculator" label="Costo promedio /kg" [value]="'$ ' + (stats().costoKilo | number: '1.2-2')" accent="#34d399" />
+    </section>
+
+    <section class="rf-grid-2">
+      <reforma-chart-card
+        title="Producción por mes (kg)"
+        icon="pi-chart-bar"
+        [loading]="cargando()"
+        [empty]="!cargando() && produccionMensual().valores.length === 0"
+        emptyText="Registrá fabricaciones para ver la producción"
+      >
+        <reforma-apex [options]="chartProduccion()" />
+      </reforma-chart-card>
+      <reforma-chart-card
+        title="Consumo de materias primas"
+        icon="pi-chart-bar"
+        [empty]="true"
+        emptyText="Disponible próximamente — requiere agregación de consumo en el backend"
+      />
+    </section>
+
+    <section class="rf-panel">
+      <reforma-chart-card
+        title="Evolución del costo por kilo"
+        icon="pi-chart-line"
+        [empty]="true"
+        emptyText="Disponible próximamente — requiere histórico de costos en el backend"
+      />
+    </section>
+
     @if (fabricacionEliminando()) {
-      <section class="panel eliminar">
-        <h3>Eliminar fabricacion {{ fabricacionEliminando()!.codigoFabricacion }}</h3>
-        <p class="warn-adv">
-          Se restaurara el stock de las materias primas usadas. El costo registrado se conserva en el
-          historial hasta que se elimine la fabricacion.
+      <section class="reforma-section eliminar">
+        <h3 class="reforma-section-title">Eliminar fabricación {{ fabricacionEliminando()!.codigoFabricacion }}</h3>
+        <p class="reforma-alert reforma-alert-warn">
+          <i class="pi pi-exclamation-triangle"></i>
+          Se restaurará el stock de las materias primas usadas. El costo registrado se conserva en el historial hasta que se elimine la fabricación.
         </p>
-        <p>Escribi exactamente la frase siguiente para confirmar:</p>
-        <code class="frase">{{ fraseEliminarEsperada() }}</code>
-        <label>
-          Confirmacion
-          <input [(ngModel)]="textoConfirmacionEliminar" autocomplete="off" />
+        <p class="reforma-text-muted">Escribí exactamente la frase siguiente para confirmar:</p>
+        <code class="reforma-confirm-frase">{{ fraseEliminarEsperada() }}</code>
+        <label class="reforma-field">
+          <span>Confirmación</span>
+          <input class="reforma-input" [(ngModel)]="textoConfirmacionEliminar" autocomplete="off" />
         </label>
-        <div class="acciones-form">
+        <div class="acciones-confirmar">
+          <button type="button" class="reforma-btn-ghost" (click)="cancelarEliminar()">Cancelar</button>
           <button
             type="button"
-            class="danger"
+            class="reforma-btn-danger"
             [disabled]="!puedeConfirmarEliminar() || guardando()"
             (click)="confirmarEliminar()"
           >
-            Eliminar fabricacion
+            <i class="pi pi-trash"></i> Eliminar fabricación
           </button>
-          <button type="button" class="secundario" (click)="cancelarEliminar()">Cancelar</button>
         </div>
       </section>
     }
@@ -50,54 +98,62 @@ import {
     @if (!fabricacionEliminando()) {
       <section class="lista">
         @if (cargando()) {
-          <p>Cargando…</p>
+          <p class="reforma-empty">Cargando…</p>
         } @else if (fabricaciones().length === 0) {
-          <p class="vacio">Todavia no hay fabricaciones cargadas.</p>
+          <p class="reforma-empty">Todavía no hay fabricaciones cargadas.</p>
         } @else {
-          <table>
-            <thead>
-              <tr>
-                <th>Codigo</th>
-                <th>Fecha</th>
-                <th>Descripcion</th>
-                <th>Formula</th>
-                <th>Veces</th>
-                <th>Costo</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (f of fabricaciones(); track f.id) {
-                <tr [class.sin-stock]="f.sinExistencias">
-                  <td>{{ f.codigoFabricacion }}</td>
-                  <td>{{ f.fechaFabricacion | date: 'dd/MM/yyyy' : 'UTC' }}</td>
-                  <td>{{ f.descripcionFabricacion }}</td>
-                  <td>{{ f.codigoFormula ?? '—' }}</td>
-                  <td>{{ f.veces | number: '1.3-3' }}</td>
-                  <td>$ {{ f.costoTotalFabricacion | number: '1.3-3' }}</td>
-                  <td>
-                    <span [class.borrador]="f.estado === 'BORRADOR'">{{ f.estado }}</span>
-                    @if (f.sinExistencias) {
-                      <span class="warn-badge">Sin stock</span>
-                    }
-                  </td>
-                  <td class="acciones">
-                    <a [routerLink]="[f.id]">Ver</a>
-                    <button type="button" class="link danger-text" (click)="iniciarEliminar(f)">
-                      Eliminar
-                    </button>
-                  </td>
+          <div class="reforma-table-wrap">
+            <table class="reforma-table">
+              <thead>
+                <tr>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Código</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('fecha')" [class.is-desc]="orden.esDesc('fecha')" (click)="orden.alternar('fecha')">Fecha</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('descripcion')" [class.is-desc]="orden.esDesc('descripcion')" (click)="orden.alternar('descripcion')">Descripción</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('formula')" [class.is-desc]="orden.esDesc('formula')" (click)="orden.alternar('formula')">Fórmula</th>
+                  <th class="num sortable" [class.is-asc]="orden.esAsc('veces')" [class.is-desc]="orden.esDesc('veces')" (click)="orden.alternar('veces')">Veces</th>
+                  <th class="num sortable" [class.is-asc]="orden.esAsc('costo')" [class.is-desc]="orden.esDesc('costo')" (click)="orden.alternar('costo')">Costo</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('estado')" [class.is-desc]="orden.esDesc('estado')" (click)="orden.alternar('estado')">Estado</th>
+                  <th></th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (f of fabricacionesOrdenadas(); track f.id) {
+                  <tr [class.sin-stock]="f.sinExistencias">
+                    <td>{{ f.codigoFabricacion }}</td>
+                    <td>{{ f.fechaFabricacion | date: 'dd/MM/yyyy' : 'UTC' }}</td>
+                    <td>{{ f.descripcionFabricacion }}</td>
+                    <td>{{ f.codigoFormula ?? '—' }}</td>
+                    <td class="num">{{ f.veces | number: '1.3-3' }}</td>
+                    <td class="num">$ {{ f.costoTotalFabricacion | number: '1.3-3' }}</td>
+                    <td>
+                      <span class="estado-chip" [class.borrador]="f.estado === 'BORRADOR'">
+                        {{ f.estado }}
+                      </span>
+                      @if (f.sinExistencias) {
+                        <span class="estado-chip warn"><i class="pi pi-exclamation-triangle"></i> Sin stock</span>
+                      }
+                    </td>
+                    <td class="acciones">
+                      <a [routerLink]="[f.id]" class="reforma-btn-ghost reforma-btn-sm">
+                        <i class="pi pi-eye"></i> Ver
+                      </a>
+                      <button type="button" class="reforma-btn-danger" (click)="iniciarEliminar(f)">
+                        <i class="pi pi-trash"></i> Eliminar
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         }
       </section>
     }
 
     @if (error()) {
-      <p class="error">{{ error() }}</p>
+      <p class="reforma-alert reforma-alert-error">
+        <i class="pi pi-exclamation-circle"></i> {{ error() }}
+      </p>
     }
   `,
   styles: [
@@ -105,100 +161,60 @@ import {
       :host {
         display: block;
       }
-      .toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-      }
-      h2 {
-        margin: 0;
-      }
-      a.btn-nueva {
-        background: #166534;
-        color: white;
-        text-decoration: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 1rem;
-      }
-      th,
-      td {
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #e5e7eb;
-        text-align: left;
-      }
-      .acciones {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-      }
-      .acciones a,
-      .acciones button.link {
-        color: #166534;
-        background: none;
-        border: none;
-        cursor: pointer;
-        text-decoration: underline;
-        padding: 0;
-        font: inherit;
-      }
-      .danger-text {
-        color: #b91c1c !important;
-      }
-      .borrador {
-        color: #b45309;
-        font-weight: 600;
-      }
-      .warn-badge {
-        display: inline-block;
-        margin-left: 0.35rem;
-        font-size: 0.75rem;
-        color: #b91c1c;
-      }
-      .sin-stock td {
-        background: #fef2f2;
-      }
-      .panel {
+      .eliminar {
         margin: 1.25rem 0;
-        padding: 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #fafafa;
       }
-      .frase {
-        display: block;
-        padding: 0.5rem;
-        background: #f3f4f6;
+      .reforma-text-muted {
+        color: var(--reforma-text-dim);
         margin: 0.5rem 0;
       }
-      .warn-adv {
-        color: #b45309;
+      .reforma-confirm-frase {
+        display: block;
+        padding: 0.6rem 0.85rem;
+        background: var(--glass-bg-strong);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 8px;
+        color: var(--reforma-text);
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
       }
-      .error {
-        color: #b91c1c;
+      .acciones-confirmar {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 1rem;
       }
-      .vacio {
-        color: #6b7280;
+      .lista .acciones {
+        text-align: right;
+        width: 1%;
+        white-space: nowrap;
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
       }
-      button.danger {
-        background: #b91c1c;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
+      .estado-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        background: rgba(52, 211, 153, 0.16);
+        color: #bbf7d0;
       }
-      button.secundario {
-        background: #e5e7eb;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
+      .estado-chip.borrador {
+        background: rgba(251, 191, 36, 0.16);
+        color: #fde68a;
+      }
+      .estado-chip.warn {
+        margin-left: 0.35rem;
+        background: rgba(248, 113, 113, 0.16);
+        color: #fecaca;
+      }
+      tr.sin-stock td {
+        background: rgba(248, 113, 113, 0.06);
       }
     `,
   ],
@@ -208,11 +224,46 @@ export class FabricacionesComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   fabricaciones = signal<FabricacionResumen[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly fabricacionesOrdenadas = computed(() =>
+    this.orden.ordenar(this.fabricaciones(), {
+      codigo: (f) => f.codigoFabricacion,
+      fecha: (f) => f.fechaFabricacion,
+      descripcion: (f) => f.descripcionFabricacion,
+      formula: (f) => f.codigoFormula,
+      veces: (f) => f.veces,
+      costo: (f) => f.costoTotalFabricacion,
+      estado: (f) => f.estado,
+    }),
+  );
   cargando = signal(true);
   guardando = signal(false);
   error = signal<string | null>(null);
   fabricacionEliminando = signal<FabricacionResumen | null>(null);
   textoConfirmacionEliminar = '';
+
+  readonly stats = computed(() => {
+    const fs = this.fabricaciones();
+    const kilos = fs.reduce((s, f) => s + f.veces * 1000, 0);
+    const costo = fs.reduce((s, f) => s + f.costoTotalFabricacion, 0);
+    return {
+      total: fs.length,
+      kilos,
+      costo,
+      costoKilo: kilos > 0 ? costo / kilos : 0,
+    };
+  });
+
+  readonly produccionMensual = computed(() =>
+    sumarPorMes(this.fabricaciones(), (f) => f.fechaFabricacion, (f) => f.veces * 1000),
+  );
+  readonly chartProduccion = computed(() =>
+    barChart({
+      categories: this.produccionMensual().labels,
+      series: [{ name: 'Kilos', data: this.produccionMensual().valores }],
+      height: 300,
+    }),
+  );
 
   fraseEliminarEsperada = () => {
     const f = this.fabricacionEliminando();

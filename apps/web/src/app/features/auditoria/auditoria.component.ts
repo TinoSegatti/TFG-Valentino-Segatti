@@ -1,8 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
+import { SelectModule } from 'primeng/select';
 import { ReformaApiService } from '../../data/api/reforma-api.service';
 import {
   ACCIONES_AUDITORIA,
@@ -10,6 +10,8 @@ import {
   AuditoriaRegistro,
 } from '../../data/models/auditoria.model';
 import { mensajeErrorHttp } from '../../core/http/api-error.util';
+import { AccountNavComponent } from '../../shared/account-nav.component';
+import { OrdenTabla } from '../../shared/orden-tabla';
 
 /**
  * Consola de auditoría (Etapa 5). Solo lectura, visible para el dueño (OWNER) y el jefe (ADMIN).
@@ -18,93 +20,121 @@ import { mensajeErrorHttp } from '../../core/http/api-error.util';
 @Component({
   selector: 'app-auditoria',
   standalone: true,
-  imports: [FormsModule, RouterLink, DatePipe],
+  imports: [FormsModule, DatePipe, SelectModule, AccountNavComponent],
   template: `
-    <header class="bar">
-      <h1>Auditoría</h1>
-      <a routerLink="/mis-plantas">Volver</a>
-    </header>
+    <app-account-nav />
 
-    <main class="contenido">
+    <main class="page">
+      <h1 class="reforma-page-title">Auditoría</h1>
+
       @if (error()) {
-        <p class="error">{{ error() }}</p>
+        <p class="reforma-alert reforma-alert-error"><i class="pi pi-exclamation-circle"></i> {{ error() }}</p>
       }
 
-      <section class="filtros">
-        <select name="accion" [(ngModel)]="fAccion">
-          <option [ngValue]="undefined">Todas las acciones</option>
-          @for (a of acciones; track a) {
-            <option [ngValue]="a">{{ a }}</option>
-          }
-        </select>
-        <input name="idGranja" placeholder="ID de granja" [(ngModel)]="fIdGranja" />
-        <input name="idUsuario" placeholder="ID de usuario" [(ngModel)]="fIdUsuario" />
-        <label>Desde <input name="desde" type="date" [(ngModel)]="fDesde" /></label>
-        <label>Hasta <input name="hasta" type="date" [(ngModel)]="fHasta" /></label>
-        <button type="button" (click)="filtrar()" [disabled]="cargando()">Filtrar</button>
-        <button type="button" class="sec" (click)="limpiar()" [disabled]="cargando()">Limpiar</button>
+      <section class="reforma-section filtros">
+        <label class="reforma-field accion">
+          <span>Acción</span>
+          <p-select
+            name="accion"
+            [options]="acciones"
+            [(ngModel)]="fAccion"
+            placeholder="Todas las acciones"
+            [showClear]="true"
+            [filter]="true"
+            appendTo="body"
+          />
+        </label>
+        <label class="reforma-field">
+          <span>ID de granja</span>
+          <input class="reforma-input" name="idGranja" placeholder="g_…" [(ngModel)]="fIdGranja" />
+        </label>
+        <label class="reforma-field">
+          <span>ID de usuario</span>
+          <input class="reforma-input" name="idUsuario" placeholder="u_…" [(ngModel)]="fIdUsuario" />
+        </label>
+        <label class="reforma-field fecha">
+          <span>Desde</span>
+          <input class="reforma-input" name="desde" type="date" [(ngModel)]="fDesde" />
+        </label>
+        <label class="reforma-field fecha">
+          <span>Hasta</span>
+          <input class="reforma-input" name="hasta" type="date" [(ngModel)]="fHasta" />
+        </label>
+        <div class="filtros-acciones">
+          <button type="button" class="reforma-btn" (click)="filtrar()" [disabled]="cargando()">
+            <i class="pi pi-filter"></i> Filtrar
+          </button>
+          <button type="button" class="reforma-btn-ghost" (click)="limpiar()" [disabled]="cargando()">
+            <i class="pi pi-times"></i> Limpiar
+          </button>
+        </div>
       </section>
 
       @if (cargando()) {
-        <p>Cargando…</p>
+        <p class="reforma-empty">Cargando…</p>
       } @else {
-        <p class="total">{{ totalElementos() }} evento(s)</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Actor</th>
-              <th>Acción</th>
-              <th>Descripción</th>
-              <th>Granja</th>
-              <th>IP</th>
-              <th>Datos</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (r of registros(); track r.id) {
+        <p class="total text-dim">{{ totalElementos() }} evento(s)</p>
+        <div class="reforma-table-wrap">
+          <table class="reforma-table">
+            <thead>
               <tr>
-                <td>{{ r.fechaOperacion | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
-                <td>
-                  <span class="actor">{{ r.actorNombre || '—' }}</span>
-                  <small>{{ r.actorEmail || r.idUsuario }}</small>
-                </td>
-                <td><span class="chip">{{ r.accion }}</span></td>
-                <td>{{ r.descripcion || '—' }}</td>
-                <td>{{ r.idGranja || '—' }}</td>
-                <td>{{ r.ipAddress || '—' }}</td>
-                <td>
-                  @if (r.datosNuevos || r.datosAnteriores) {
-                    <details>
-                      <summary>ver</summary>
-                      @if (r.datosAnteriores) {
-                        <p class="json-lbl">Antes</p>
-                        <pre>{{ r.datosAnteriores }}</pre>
-                      }
-                      @if (r.datosNuevos) {
-                        <p class="json-lbl">Después</p>
-                        <pre>{{ r.datosNuevos }}</pre>
-                      }
-                    </details>
-                  } @else {
-                    —
-                  }
-                </td>
+                <th class="sortable" [class.is-asc]="orden.esAsc('fecha')" [class.is-desc]="orden.esDesc('fecha')" (click)="orden.alternar('fecha')">Fecha</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('actor')" [class.is-desc]="orden.esDesc('actor')" (click)="orden.alternar('actor')">Actor</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('accion')" [class.is-desc]="orden.esDesc('accion')" (click)="orden.alternar('accion')">Acción</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('descripcion')" [class.is-desc]="orden.esDesc('descripcion')" (click)="orden.alternar('descripcion')">Descripción</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('granja')" [class.is-desc]="orden.esDesc('granja')" (click)="orden.alternar('granja')">Granja</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('ip')" [class.is-desc]="orden.esDesc('ip')" (click)="orden.alternar('ip')">IP</th>
+                <th>Datos</th>
               </tr>
-            } @empty {
-              <tr><td colspan="7">No hay eventos para los filtros aplicados.</td></tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (r of registrosOrdenados(); track r.id) {
+                <tr>
+                  <td class="nowrap">{{ r.fechaOperacion | date: 'dd/MM/yyyy HH:mm:ss' }}</td>
+                  <td>
+                    <span class="actor">{{ r.actorNombre || '—' }}</span>
+                    <small class="text-dim">{{ r.actorEmail || r.idUsuario }}</small>
+                  </td>
+                  <td><span class="chip">{{ r.accion }}</span></td>
+                  <td>{{ r.descripcion || '—' }}</td>
+                  <td>{{ r.idGranja || '—' }}</td>
+                  <td>{{ r.ipAddress || '—' }}</td>
+                  <td>
+                    @if (r.datosNuevos || r.datosAnteriores) {
+                      <details>
+                        <summary>ver</summary>
+                        @if (r.datosAnteriores) {
+                          <p class="json-lbl">Antes</p>
+                          <pre>{{ r.datosAnteriores }}</pre>
+                        }
+                        @if (r.datosNuevos) {
+                          <p class="json-lbl">Después</p>
+                          <pre>{{ r.datosNuevos }}</pre>
+                        }
+                      </details>
+                    } @else {
+                      —
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="7" class="reforma-empty">No hay eventos para los filtros aplicados.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
 
         <nav class="paginacion">
-          <button type="button" (click)="irA(pagina() - 1)" [disabled]="pagina() <= 0">‹ Anterior</button>
-          <span>Página {{ pagina() + 1 }} de {{ totalPaginas() || 1 }}</span>
+          <button type="button" class="reforma-btn-ghost" (click)="irA(pagina() - 1)" [disabled]="pagina() <= 0">
+            <i class="pi pi-chevron-left"></i> Anterior
+          </button>
+          <span class="text-dim">Página {{ pagina() + 1 }} de {{ totalPaginas() || 1 }}</span>
           <button
             type="button"
+            class="reforma-btn-ghost"
             (click)="irA(pagina() + 1)"
             [disabled]="pagina() + 1 >= totalPaginas()">
-            Siguiente ›
+            Siguiente <i class="pi pi-chevron-right"></i>
           </button>
         </nav>
       }
@@ -112,99 +142,80 @@ import { mensajeErrorHttp } from '../../core/http/api-error.util';
   `,
   styles: [
     `
-      .bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        font-family: system-ui, sans-serif;
+      :host {
+        display: block;
       }
-      .contenido {
-        padding: 0 1rem 2rem;
-        font-family: system-ui, sans-serif;
-        max-width: 78rem;
+      .page {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 1.5rem;
       }
       .filtros {
         display: flex;
-        gap: 0.5rem;
+        gap: 1rem;
         flex-wrap: wrap;
-        align-items: center;
-        margin-bottom: 1rem;
+        align-items: flex-end;
+        margin-bottom: 1.25rem;
       }
-      .filtros input,
-      .filtros select {
-        padding: 0.4rem;
+      .reforma-field {
+        flex: 1 1 11rem;
+        min-width: 8rem;
       }
-      label {
-        font-size: 0.85rem;
-        color: #374151;
+      .reforma-field.fecha {
+        flex: 0 1 10rem;
+      }
+      .filtros-acciones {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end;
       }
       .total {
-        color: #6b7280;
         font-size: 0.85rem;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.9rem;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
-        vertical-align: top;
+        margin: 0 0 0.75rem;
       }
       .actor {
         display: block;
       }
-      small {
-        color: #6b7280;
-      }
-      .chip {
-        background: #eef2ff;
-        color: #3730a3;
-        padding: 0.15rem 0.45rem;
-        border-radius: 0.5rem;
-        font-size: 0.78rem;
+      .nowrap {
         white-space: nowrap;
       }
+      .chip {
+        background: var(--reforma-accent-soft);
+        color: #ede9fe;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        white-space: nowrap;
+      }
+      details summary {
+        cursor: pointer;
+        color: var(--reforma-accent);
+      }
       pre {
-        background: #f9fafb;
-        padding: 0.4rem;
-        border-radius: 0.3rem;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid var(--glass-border);
+        color: var(--reforma-text);
+        padding: 0.5rem;
+        border-radius: 8px;
         max-width: 24rem;
         overflow: auto;
         font-size: 0.78rem;
       }
       .json-lbl {
-        margin: 0.3rem 0 0;
+        margin: 0.4rem 0 0.2rem;
         font-weight: 600;
         font-size: 0.78rem;
-      }
-      button {
-        padding: 0.4rem 0.7rem;
-        background: #166534;
-        color: white;
-        border: none;
-        cursor: pointer;
-        border-radius: 0.3rem;
-      }
-      button.sec {
-        background: #6b7280;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: default;
+        color: var(--reforma-text-dim);
       }
       .paginacion {
         display: flex;
         gap: 1rem;
         align-items: center;
-        margin-top: 1rem;
+        justify-content: center;
+        margin-top: 1.25rem;
       }
-      .error {
-        color: #b91c1c;
+      td {
+        vertical-align: top;
       }
     `,
   ],
@@ -215,6 +226,17 @@ export class AuditoriaComponent implements OnInit {
   readonly acciones = ACCIONES_AUDITORIA;
 
   readonly registros = signal<AuditoriaRegistro[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly registrosOrdenados = computed(() =>
+    this.orden.ordenar(this.registros(), {
+      fecha: (r) => r.fechaOperacion,
+      actor: (r) => r.actorNombre || r.actorEmail || r.idUsuario,
+      accion: (r) => r.accion,
+      descripcion: (r) => r.descripcion,
+      granja: (r) => r.idGranja,
+      ip: (r) => r.ipAddress,
+    }),
+  );
   readonly cargando = signal(true);
   readonly error = signal<string | null>(null);
   readonly pagina = signal(0);
