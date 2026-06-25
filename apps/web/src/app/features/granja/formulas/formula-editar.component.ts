@@ -11,91 +11,97 @@ import { Animal } from '../../../data/models/animal.model';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <a [routerLink]="rutaIngredientes()" class="back">← Volver a ingredientes</a>
-    <h2>Editar cabecera de formula</h2>
+    <a [routerLink]="rutaIngredientes()" class="reforma-back">
+      <i class="pi pi-arrow-left"></i> Volver a ingredientes
+    </a>
+    <h2 class="reforma-page-title">Editar cabecera de fórmula</h2>
 
     @if (cargando()) {
-      <p>Cargando…</p>
+      <p class="reforma-empty">Cargando…</p>
     } @else {
-      <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
-        <label>
-          Codigo
-          <input name="codigo" [(ngModel)]="codigoFormula" required />
-        </label>
-        <label>
-          Descripcion
-          <input name="descripcion" [(ngModel)]="descripcionFormula" required />
-        </label>
-        <label class="autocomplete">
-          Animal
-          <input
-            name="animal"
-            [(ngModel)]="nombreAnimal"
-            (ngModelChange)="onNombreAnimalChange($event)"
-            (focus)="mostrarAnimales.set(true)"
-            (blur)="cerrarAnimales()"
-            autocomplete="off"
-            required
-          />
-          @if (mostrarAnimales() && animalesFiltrados().length) {
-            <ul class="dropdown">
-              @for (a of animalesFiltrados(); track a.id) {
-                <li (mousedown)="seleccionarAnimal(a)">{{ a.descripcionAnimal }}</li>
-              }
-            </ul>
+      <section class="reforma-section">
+        <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
+          <label class="reforma-field">
+            <span>Código</span>
+            <input class="reforma-input" name="codigo" [(ngModel)]="codigoFormula" required />
+          </label>
+          <label class="reforma-field full">
+            <span>Descripción</span>
+            <input class="reforma-input" name="descripcion" [(ngModel)]="descripcionFormula" required />
+          </label>
+          <label class="reforma-field reforma-autocomplete full">
+            <span>Animal</span>
+            <input
+              class="reforma-input"
+              name="animal"
+              [(ngModel)]="nombreAnimal"
+              (ngModelChange)="onNombreAnimalChange($event)"
+              (focus)="mostrarAnimales.set(true)"
+              (blur)="cerrarAnimales()"
+              autocomplete="off"
+              required
+            />
+            @if (mostrarAnimales() && animalesFiltrados().length) {
+              <ul class="dropdown">
+                @for (a of animalesFiltrados(); track a.id) {
+                  <li (mousedown)="seleccionarAnimal(a)">{{ a.descripcionAnimal }}</li>
+                }
+              </ul>
+            }
+          </label>
+
+          <div class="acciones">
+            <a [routerLink]="rutaIngredientes()" class="reforma-btn-ghost">
+              <i class="pi pi-times"></i> Cancelar
+            </a>
+            <button class="reforma-btn" type="submit" [disabled]="guardando() || f.invalid || !idAnimalSeleccionado()">
+              <i class="pi pi-check"></i> Guardar
+            </button>
+          </div>
+          @if (error()) {
+            <p class="reforma-alert reforma-alert-error">
+              <i class="pi pi-exclamation-circle"></i> {{ error() }}
+            </p>
           }
-        </label>
-        <button type="submit" [disabled]="guardando() || f.invalid || !idAnimalSeleccionado()">
-          Guardar
-        </button>
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
-      </form>
+        </form>
+      </section>
     }
   `,
   styles: [
     `
-      .back {
-        color: #166534;
+      :host {
+        display: block;
+        max-width: 48rem;
+      }
+      .reforma-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--reforma-accent);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+      .reforma-back:hover {
+        color: var(--reforma-text);
       }
       .formulario {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        max-width: 480px;
       }
-      label {
+      .reforma-field.full {
+        grid-column: 1 / -1;
+      }
+      .acciones {
+        grid-column: 1 / -1;
         display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
       }
-      .autocomplete {
-        position: relative;
-      }
-      .dropdown {
-        position: absolute;
-        z-index: 10;
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        background: white;
-        border: 1px solid #d1d5db;
-        width: 100%;
-      }
-      .dropdown li {
-        padding: 0.5rem;
-        cursor: pointer;
-      }
-      button {
-        padding: 0.5rem 1rem;
-        background: #166534;
-        color: white;
-        border: none;
-        border-radius: 4px;
-      }
-      .error {
-        color: #b91c1c;
+      .reforma-alert {
+        grid-column: 1 / -1;
       }
     `,
   ],

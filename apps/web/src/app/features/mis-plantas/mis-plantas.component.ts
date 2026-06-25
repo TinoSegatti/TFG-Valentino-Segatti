@@ -4,103 +4,118 @@ import { ReformaApiService } from '../../data/api/reforma-api.service';
 import { AuthStateService } from '../../core/auth/auth-state.service';
 import { decodeJwtClaims } from '../../core/auth/jwt.utils';
 import { Granja } from '../../data/models/granja.model';
+import { AccountNavComponent } from '../../shared/account-nav.component';
 
 @Component({
   selector: 'app-mis-plantas',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, AccountNavComponent],
   template: `
-    <header class="bar">
-      <h1>Mis granjas</h1>
-      <nav>
-        <a routerLink="/perfil">Perfil</a>
-        @if (puedeGestionarEquipo()) {
-          <a routerLink="/equipo">Equipo</a>
-          <a routerLink="/auditoria">Auditoría</a>
-        }
-        <button type="button" (click)="logout()">Salir</button>
-      </nav>
-    </header>
-    @if (loading()) {
-      <p>Cargando…</p>
-    } @else if (error()) {
-      <p class="error">{{ error() }}</p>
-      <p><a routerLink="/auth/login">Volver a ingresar</a></p>
-    } @else {
-      <ul>
-        @for (g of granjas(); track g.id) {
-          <li>
-            <a [routerLink]="['/granja', g.id]">{{ g.nombreGranja }}</a>
-          </li>
-        } @empty {
-          <li class="vacio">Todavía no tenés granjas. Creá la primera abajo.</li>
-        }
-      </ul>
+    <div class="page">
+      <app-account-nav />
 
-      @if (esDueno()) {
-        <form class="crear" (submit)="crearGranja($event)">
-          <h2>Crear granja</h2>
-          <div class="fila">
-            <input
-              type="text"
-              placeholder="Nombre de la granja (ej. Planta Norte)"
-              [value]="nombreNueva()"
-              (input)="nombreNueva.set($any($event.target).value)"
-              [disabled]="creando()"
-              maxlength="200"
-            />
-            <button type="submit" [disabled]="creando() || !nombreNueva().trim()">
-              {{ creando() ? 'Creando…' : 'Crear granja' }}
-            </button>
-          </div>
-          @if (errorCrear()) {
-            <p class="error">{{ errorCrear() }}</p>
+      <div class="body">
+        <h1 class="reforma-page-title">Mis granjas</h1>
+
+        @if (loading()) {
+          <p class="text-dim">Cargando…</p>
+        } @else if (error()) {
+          <p class="reforma-alert reforma-alert-error">{{ error() }}</p>
+          <p><a routerLink="/auth/login">Volver a ingresar</a></p>
+        } @else {
+          <ul class="granjas">
+            @for (g of granjas(); track g.id) {
+              <li class="glass-card">
+                <a [routerLink]="['/granja', g.id]">
+                  <i class="pi pi-building"></i>
+                  <span>{{ g.nombreGranja }}</span>
+                  <i class="pi pi-arrow-right go"></i>
+                </a>
+              </li>
+            } @empty {
+              <li class="vacio text-dim">Todavía no tenés granjas. Creá la primera abajo.</li>
+            }
+          </ul>
+
+          @if (esDueno()) {
+            <form class="crear glass-card" (submit)="crearGranja($event)">
+              <h2>Crear granja</h2>
+              <div class="fila">
+                <input
+                  class="reforma-input"
+                  type="text"
+                  placeholder="Nombre de la granja (ej. Planta Norte)"
+                  [value]="nombreNueva()"
+                  (input)="nombreNueva.set($any($event.target).value)"
+                  [disabled]="creando()"
+                  maxlength="200"
+                />
+                <button class="reforma-btn" type="submit" [disabled]="creando() || !nombreNueva().trim()">
+                  {{ creando() ? 'Creando…' : 'Crear granja' }}
+                </button>
+              </div>
+              @if (errorCrear()) {
+                <p class="reforma-alert reforma-alert-error">{{ errorCrear() }}</p>
+              }
+            </form>
           }
-        </form>
-      }
-    }
+        }
+      </div>
+    </div>
   `,
   styles: [
     `
-      .bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem;
-        font-family: system-ui, sans-serif;
+      .page {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
       }
-      ul {
+      .body {
+        padding: 1.5rem;
+        max-width: 60rem;
+        margin: 0 auto;
+      }
+      .granjas {
         list-style: none;
+        padding: 0;
+        margin: 0 0 1.5rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+        gap: 1rem;
+      }
+      .granjas li a {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.1rem 1.25rem;
+        color: var(--reforma-text);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .granjas li a .go {
+        margin-left: auto;
+        color: var(--reforma-accent);
+      }
+      .granjas li.vacio {
         padding: 1rem;
-      }
-      .error {
-        color: #b91c1c;
-      }
-      .vacio {
-        color: #6b7280;
+        grid-column: 1 / -1;
+        border: 1px dashed var(--glass-border-strong);
+        border-radius: 12px;
       }
       .crear {
-        padding: 1rem;
-        max-width: 32rem;
-        font-family: system-ui, sans-serif;
+        padding: 1.25rem;
+        width: 100%;
+        box-sizing: border-box;
       }
       .crear h2 {
         font-size: 1rem;
-        margin: 0 0 0.5rem;
+        margin: 0 0 0.75rem;
+        color: var(--reforma-text);
       }
       .crear .fila {
         display: flex;
         gap: 0.5rem;
       }
-      .crear input {
+      .crear .fila .reforma-input {
         flex: 1;
-        padding: 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.375rem;
-      }
-      .crear button {
-        padding: 0.5rem 1rem;
-        cursor: pointer;
       }
     `,
   ],
@@ -117,12 +132,6 @@ export class MisPlantasComponent implements OnInit {
   readonly nombreNueva = signal('');
   readonly creando = signal(false);
   readonly errorCrear = signal<string | null>(null);
-
-  /** Solo el dueño (OWNER) y el jefe (ADMIN) gestionan el equipo. */
-  readonly puedeGestionarEquipo = computed(() => {
-    const claims = decodeJwtClaims(this.auth.getToken());
-    return !claims?.esEmpleado || claims.rolEmpleado === 'ADMIN';
-  });
 
   /** Crear granjas es exclusivo del dueño (los empleados operan, no crean). */
   readonly esDueno = computed(() => !decodeJwtClaims(this.auth.getToken())?.esEmpleado);

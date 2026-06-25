@@ -10,46 +10,70 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
   imports: [FormsModule, RouterLink],
   template: `
     <main class="auth">
-      <h1>REFORMA</h1>
-      <p>Gestión integral de granjas</p>
-      @if (sessionExpired()) {
-        <p class="notice">Tu sesión expiró. Ingresá de nuevo.</p>
-      }
-      @if (resetOk()) {
-        <p class="ok">Tu contraseña fue actualizada. Ingresá con la nueva.</p>
-      }
-      @if (invitacionOk()) {
-        <p class="ok">Tu cuenta de empleado fue activada. Ingresá con tu nueva contraseña.</p>
-      }
-      <form (ngSubmit)="onSubmit()">
-        <label>
-          Email
-          <input type="email" name="email" [(ngModel)]="email" required />
-        </label>
-        <label>
-          Contraseña
-          <input type="password" name="password" [(ngModel)]="password" required />
-        </label>
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
+      <section class="card glass-card">
+        <span class="brand">REFORMA</span>
+        <p class="lead">Gestión integral de granjas</p>
+        @if (sessionExpired()) {
+          <p class="reforma-alert reforma-alert-warn">Tu sesión expiró. Ingresá de nuevo.</p>
         }
-        <button type="submit" [disabled]="loading()">Ingresar</button>
-      </form>
-      <nav class="links">
-        <a routerLink="/auth/registro">Crear cuenta</a>
-        <a routerLink="/auth/olvide-password">¿Olvidaste tu contraseña?</a>
-        <a routerLink="/auth/reenviar-verificacion">Reenviar verificación</a>
-        <a routerLink="/">Volver</a>
-      </nav>
+        @if (resetOk()) {
+          <p class="reforma-alert reforma-alert-ok">Tu contraseña fue actualizada. Ingresá con la nueva.</p>
+        }
+        @if (invitacionOk()) {
+          <p class="reforma-alert reforma-alert-ok">Tu cuenta de empleado fue activada. Ingresá con tu nueva contraseña.</p>
+        }
+        <form (ngSubmit)="onSubmit()">
+          <label>
+            Email
+            <input class="reforma-input" type="email" name="email" [(ngModel)]="email" required />
+          </label>
+          <label>
+            Contraseña
+            <input class="reforma-input" type="password" name="password" [(ngModel)]="password" required />
+          </label>
+          @if (error()) {
+            <p class="reforma-alert reforma-alert-error">{{ error() }}</p>
+          }
+          <button class="reforma-btn" type="submit" [disabled]="loading()">
+            {{ loading() ? 'Ingresando…' : 'Ingresar' }}
+          </button>
+        </form>
+        <nav class="links">
+          <a routerLink="/auth/registro">Crear cuenta</a>
+          <a routerLink="/auth/olvide-password">¿Olvidaste tu contraseña?</a>
+          <a routerLink="/auth/reenviar-verificacion">Reenviar verificación</a>
+          <a routerLink="/">Volver</a>
+        </nav>
+      </section>
     </main>
   `,
   styles: [
     `
       .auth {
-        max-width: 24rem;
-        margin: 4rem auto;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         padding: 1.5rem;
-        font-family: system-ui, sans-serif;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      .card {
+        width: 100%;
+        max-width: 24rem;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .brand {
+        font-weight: 800;
+        letter-spacing: 0.2em;
+        color: var(--reforma-accent);
+        font-size: 1.25rem;
+      }
+      .lead {
+        margin: -0.5rem 0 0.5rem;
+        color: var(--reforma-text-dim);
       }
       form {
         display: flex;
@@ -59,38 +83,16 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
       label {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-      }
-      input {
-        padding: 0.5rem;
-      }
-      .error {
-        color: #b91c1c;
-      }
-      .notice {
-        color: #92400e;
-        background: #fef3c7;
-        padding: 0.5rem 0.75rem;
-        border-radius: 4px;
-      }
-      .ok {
-        color: #065f46;
-        background: #d1fae5;
-        padding: 0.5rem 0.75rem;
-        border-radius: 4px;
+        gap: 0.35rem;
+        color: var(--reforma-text-dim);
+        font-size: 0.9rem;
       }
       .links {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
-        margin-top: 1rem;
-      }
-      button {
-        padding: 0.6rem;
-        background: #166534;
-        color: white;
-        border: none;
-        cursor: pointer;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
       }
     `,
   ],

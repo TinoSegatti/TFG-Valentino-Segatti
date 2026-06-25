@@ -11,89 +11,83 @@ import { hoyIsoFabricacion } from '../../../data/models/fabricacion.model';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <a routerLink=".." class="back">← Volver al listado</a>
-    <h2>Nueva fabricacion</h2>
-    <p class="subtitulo">Completá la cabecera; luego elegirás la formula y las veces a fabricar.</p>
+    <a routerLink=".." class="reforma-back"><i class="pi pi-arrow-left"></i> Volver al listado</a>
+    <h2 class="reforma-page-title">Nueva fabricación</h2>
+    <p class="subtitulo">Completá la cabecera; luego elegirás la fórmula y las veces a fabricar.</p>
 
-    <form (ngSubmit)="crear()" #f="ngForm" class="formulario">
-      <label>
-        Codigo de fabricacion
-        <input name="codigo" [(ngModel)]="codigoFabricacion" maxlength="50" required />
-      </label>
-      <label>
-        Fecha
-        <input type="date" name="fecha" [(ngModel)]="fechaFabricacion" [max]="hoy" required />
-      </label>
-      <label class="ancho">
-        Descripcion
-        <input name="descripcion" [(ngModel)]="descripcionFabricacion" maxlength="200" required />
-      </label>
-      <label class="ancho">
-        Observaciones
-        <input name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
-      </label>
+    <section class="reforma-section">
+      <form (ngSubmit)="crear()" #f="ngForm" class="formulario">
+        <label class="reforma-field">
+          <span>Código de fabricación</span>
+          <input class="reforma-input" name="codigo" [(ngModel)]="codigoFabricacion" maxlength="50" required />
+        </label>
+        <label class="reforma-field">
+          <span>Fecha</span>
+          <input class="reforma-input" type="date" name="fecha" [(ngModel)]="fechaFabricacion" [max]="hoy" required />
+        </label>
+        <label class="reforma-field full">
+          <span>Descripción</span>
+          <input class="reforma-input" name="descripcion" [(ngModel)]="descripcionFabricacion" maxlength="200" required />
+        </label>
+        <label class="reforma-field full">
+          <span>Observaciones</span>
+          <input class="reforma-input" name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
+        </label>
 
-      <div class="acciones-form">
-        <button type="submit" [disabled]="guardando() || f.invalid">Guardar e ir al detalle</button>
-        <a routerLink=".." class="btn-cancelar">Cancelar</a>
-      </div>
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-    </form>
+        <div class="acciones">
+          <a routerLink=".." class="reforma-btn-ghost"><i class="pi pi-times"></i> Cancelar</a>
+          <button class="reforma-btn" type="submit" [disabled]="guardando() || f.invalid">
+            <i class="pi pi-check"></i> Guardar e ir al detalle
+          </button>
+        </div>
+        @if (error()) {
+          <p class="reforma-alert reforma-alert-error">
+            <i class="pi pi-exclamation-circle"></i> {{ error() }}
+          </p>
+        }
+      </form>
+    </section>
   `,
   styles: [
     `
       :host {
         display: block;
-        max-width: 900px;
+        max-width: 64rem;
       }
-      .back {
-        color: #166534;
+      .reforma-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--reforma-accent);
         text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+      }
+      .reforma-back:hover {
+        color: var(--reforma-text);
       }
       .subtitulo {
-        color: #6b7280;
+        color: var(--reforma-text-dim);
+        margin: 0 0 1.25rem;
       }
       .formulario {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        padding: 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #fafafa;
+        align-items: end;
       }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        font-size: 0.85rem;
-        min-width: 200px;
+      .reforma-field.full {
+        grid-column: 1 / -1;
       }
-      label.ancho {
-        flex: 1 1 100%;
-      }
-      .acciones-form {
+      .acciones {
+        grid-column: 1 / -1;
         display: flex;
         gap: 0.75rem;
-        flex: 1 1 100%;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
       }
-      button[type='submit'] {
-        background: #166534;
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .btn-cancelar {
-        color: #374151;
-        align-self: center;
-      }
-      .error {
-        color: #b91c1c;
-        flex: 1 1 100%;
+      .reforma-alert {
+        grid-column: 1 / -1;
       }
     `,
   ],

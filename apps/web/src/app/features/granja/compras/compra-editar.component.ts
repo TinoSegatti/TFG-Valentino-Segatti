@@ -11,21 +11,24 @@ import { hoyIso } from '../../../data/models/compra.model';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <a routerLink="../.." class="back">← Volver al listado</a>
-    <h2>Editar cabecera</h2>
+    <a routerLink="../.." class="reforma-back"><i class="pi pi-arrow-left"></i> Volver al listado</a>
+    <h2 class="reforma-page-title">Editar cabecera</h2>
+
     @if (cargando()) {
-      <p>Cargando…</p>
+      <p class="reforma-empty">Cargando…</p>
     } @else {
       @if (cantidadLineas() > 0) {
-        <p class="warn">
+        <p class="reforma-alert reforma-alert-warn">
+          <i class="pi pi-info-circle"></i>
           Si modificás el total, deberás ajustar el detalle para que la suma de subtotales coincida.
         </p>
       }
-      <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
-        <div class="fila-proveedor">
-          <label class="autocomplete">
-            Proveedor
+      <section class="reforma-section">
+        <form (ngSubmit)="guardar()" #f="ngForm" class="formulario">
+          <label class="reforma-field reforma-autocomplete proveedor">
+            <span>Proveedor</span>
             <input
+              class="reforma-input"
               name="nombreProveedor"
               [(ngModel)]="nombreProveedor"
               (ngModelChange)="onNombreProveedorChange($event)"
@@ -43,9 +46,10 @@ import { hoyIso } from '../../../data/models/compra.model';
               </ul>
             }
           </label>
-          <label>
-            Código de proveedor
+          <label class="reforma-field">
+            <span>Código de proveedor</span>
             <input
+              class="reforma-input"
               name="codigoProveedor"
               [(ngModel)]="codigoProveedor"
               (ngModelChange)="onCodigoProveedorChange($event)"
@@ -53,151 +57,83 @@ import { hoyIso } from '../../../data/models/compra.model';
               required
             />
           </label>
-        </div>
 
-        <label>
-          Nº / código de factura
-          <input name="numeroFactura" [(ngModel)]="numeroFactura" maxlength="100" required />
-        </label>
-        <label>
-          Fecha
-          <input type="date" name="fechaCompra" [(ngModel)]="fechaCompra" [max]="hoy" required />
-        </label>
-        <label>
-          Total factura ($)
-          <input
-            type="number"
-            name="totalFactura"
-            [(ngModel)]="totalFactura"
-            step="0.001"
-            min="0.001"
-            required
-          />
-        </label>
-        <label class="ancho">
-          Observaciones
-          <input name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
-        </label>
+          <label class="reforma-field">
+            <span>Nº / código de factura</span>
+            <input class="reforma-input" name="numeroFactura" [(ngModel)]="numeroFactura" maxlength="100" required />
+          </label>
+          <label class="reforma-field">
+            <span>Fecha</span>
+            <input class="reforma-input" type="date" name="fechaCompra" [(ngModel)]="fechaCompra" [max]="hoy" required />
+          </label>
+          <label class="reforma-field">
+            <span>Total factura ($)</span>
+            <input
+              class="reforma-input"
+              type="number"
+              name="totalFactura"
+              [(ngModel)]="totalFactura"
+              step="0.001"
+              min="0.001"
+              required
+            />
+          </label>
+          <label class="reforma-field full">
+            <span>Observaciones</span>
+            <input class="reforma-input" name="observaciones" [(ngModel)]="observaciones" maxlength="2000" />
+          </label>
 
-        <div class="acciones-form">
-          <button type="submit" [disabled]="guardando() || f.invalid || !idProveedorSeleccionado()">
-            Guardar cambios
-          </button>
-          <a routerLink="../.." class="btn-cancelar">Cancelar</a>
-        </div>
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
-      </form>
+          <div class="acciones">
+            <a routerLink="../.." class="reforma-btn-ghost"><i class="pi pi-times"></i> Cancelar</a>
+            <button class="reforma-btn" type="submit" [disabled]="guardando() || f.invalid || !idProveedorSeleccionado()">
+              <i class="pi pi-check"></i> Guardar cambios
+            </button>
+          </div>
+          @if (error()) {
+            <p class="reforma-alert reforma-alert-error">
+              <i class="pi pi-exclamation-circle"></i> {{ error() }}
+            </p>
+          }
+        </form>
+      </section>
     }
   `,
   styles: [
     `
       :host {
         display: block;
-        max-width: 900px;
+        max-width: 64rem;
       }
-      .back {
-        color: #166534;
-        text-decoration: none;
-        font-size: 0.9rem;
-      }
-      h2 {
-        margin: 0.75rem 0 1rem;
-      }
-      .warn {
-        color: #b45309;
-        font-size: 0.9rem;
-        margin-bottom: 1rem;
-      }
-      .formulario {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        align-items: flex-end;
-        padding: 1rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        background: #fafafa;
-      }
-      .fila-proveedor {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        width: 100%;
-      }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        font-size: 0.85rem;
-      }
-      label.ancho {
-        flex: 1;
-        min-width: 240px;
-      }
-      label.autocomplete {
-        position: relative;
-        min-width: 260px;
-      }
-      input {
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-      }
-      .dropdown {
-        position: absolute;
-        z-index: 10;
-        top: 100%;
-        left: 0;
-        right: 0;
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        max-height: 200px;
-        overflow-y: auto;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-      }
-      .dropdown li {
-        padding: 0.45rem 0.6rem;
-        cursor: pointer;
-      }
-      .dropdown li:hover {
-        background: #ecfdf5;
-      }
-      button {
-        padding: 0.5rem 1rem;
-        background: #166534;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.5;
-      }
-      .btn-cancelar {
+      .reforma-back {
         display: inline-flex;
         align-items: center;
-        padding: 0.5rem 1rem;
-        background: #6b7280;
-        color: white;
+        gap: 0.4rem;
+        color: var(--reforma-accent);
         text-decoration: none;
-        border-radius: 4px;
         font-size: 0.9rem;
+        margin-bottom: 0.5rem;
       }
-      .acciones-form {
+      .reforma-back:hover {
+        color: var(--reforma-text);
+      }
+      .formulario {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 1rem;
+        align-items: end;
+      }
+      .reforma-field.full {
+        grid-column: 1 / -1;
+      }
+      .acciones {
+        grid-column: 1 / -1;
         display: flex;
         gap: 0.75rem;
-        width: 100%;
-        align-items: center;
+        justify-content: flex-end;
+        margin-top: 0.5rem;
       }
-      .error {
-        color: #b91c1c;
-        width: 100%;
+      .reforma-alert {
+        grid-column: 1 / -1;
       }
     `,
   ],

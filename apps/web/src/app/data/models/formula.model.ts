@@ -112,5 +112,9 @@ export function recalcularLineaFormula(linea: LineaFormulaUi): LineaFormulaUi {
     return { ...linea, costoParcial: 0, advertenciaLinea: undefined };
   }
   const costo = calcularCostoParcialFormula(linea.cantidadKg, linea.precioPorKilo);
-  return { ...linea, costoParcial: costo };
+  const advertenciaLinea =
+    linea.precioPorKilo === 0
+      ? 'Sin precio — registrá una compra para esta MP para calcular su costo.'
+      : undefined;
+  return { ...linea, costoParcial: costo, advertenciaLinea };
 }
