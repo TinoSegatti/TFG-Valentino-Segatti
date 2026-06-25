@@ -19,11 +19,13 @@ import {
   redondearCompra,
 } from '../../../data/models/compra.model';
 import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
+import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
   selector: 'app-compra-detalle',
   standalone: true,
-  imports: [FormsModule, RouterLink, DecimalPipe],
+  imports: [FormsModule, RouterLink, DecimalPipe, NumeroFormatoDirective],
   template: `
     @if (cargando()) {
       <p>Cargando factura…</p>
@@ -78,7 +80,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             </div>
             <div>
               <dt>Total factura</dt>
-              <dd>$ {{ compra()!.totalFactura | number: '1.3-3' }}</dd>
+              <dd>$ {{ compra()!.totalFactura | number: '1.2-2' }}</dd>
             </div>
             <div>
               <dt>Estado</dt>
@@ -94,7 +96,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
         } @else {
           @if (lineasConMateria().length > 0) {
             <p class="hint">
-              Si modificás el total, deberás ajustar el detalle para que la suma de subtotales coincida.
+              Si el total no coincide con la suma de subtotales, el detalle se abrirá automáticamente para ajustar.
             </p>
           }
           <form class="formulario-cabecera" (ngSubmit)="guardarCabecera()">
@@ -141,11 +143,9 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <label>
               Total factura ($)
               <input
-                type="number"
                 name="totalFactura"
+                [appNumero]="2"
                 [(ngModel)]="totalFactura"
-                step="0.001"
-                min="0.001"
                 required
               />
             </label>
@@ -200,21 +200,21 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <table class="tabla-readonly">
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Nombre</th>
-                  <th>Cantidad (kg)</th>
-                  <th>Precio/kg</th>
-                  <th>Subtotal</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Código</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('nombre')" [class.is-desc]="orden.esDesc('nombre')" (click)="orden.alternar('nombre')">Nombre</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('cantidad')" [class.is-desc]="orden.esDesc('cantidad')" (click)="orden.alternar('cantidad')">Cantidad (kg)</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('precio')" [class.is-desc]="orden.esDesc('precio')" (click)="orden.alternar('precio')">Precio/kg</th>
+                  <th class="sortable" [class.is-asc]="orden.esAsc('subtotal')" [class.is-desc]="orden.esDesc('subtotal')" (click)="orden.alternar('subtotal')">Subtotal</th>
                 </tr>
               </thead>
               <tbody>
-                @for (linea of lineas(); track $index) {
+                @for (linea of lineasOrdenadas(); track $index) {
                   <tr>
                     <td>{{ linea.codigo }}</td>
                     <td>{{ linea.nombre }}</td>
-                    <td>{{ linea.cantidadKg | number: '1.3-3' }}</td>
-                    <td>$ {{ linea.precioPorKilo | number: '1.3-3' }}</td>
-                    <td>$ {{ linea.subtotal | number: '1.3-3' }}</td>
+                    <td>{{ linea.cantidadKg | number: '1.2-2' }}</td>
+                    <td>$ {{ linea.precioPorKilo | number: '1.2-2' }}</td>
+                    <td>$ {{ linea.subtotal | number: '1.2-2' }}</td>
                   </tr>
                 }
               </tbody>
@@ -222,14 +222,15 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <p class="totales-vista">
               Suma subtotales:
               <strong [class.ok]="totalesCuadran()" [class.bad]="!totalesCuadran()">
-                $ {{ sumaSubtotales() | number: '1.3-3' }}
+                $ {{ sumaSubtotales() | number: '1.2-2' }}
               </strong>
-              / Total factura: <strong>$ {{ compra()!.totalFactura | number: '1.3-3' }}</strong>
+              / Total factura: <strong>$ {{ compra()!.totalFactura | number: '1.2-2' }}</strong>
             </p>
           }
         } @else {
           <p class="hint">
             Los cambios en cantidades o precios impactan el inventario y los precios vigentes del catálogo.
+            Si la suma no coincide con el total de la cabecera, esta se abrirá automáticamente para ajustar.
           </p>
 
           @for (linea of lineas(); track i; let i = $index) {
@@ -268,35 +269,38 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
               <label>
                 Cantidad (kg)
                 <input
-                  type="number"
-                  step="0.001"
-                  [value]="valorInput(linea.cantidadKg)"
-                  (input)="onCampoInput($event, i, 'cantidad')"
-                  (blur)="onCampoBlur(i, 'cantidad')"
+                  [appNumero]="2"
+                  [ngModel]="linea.cantidadKg"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="onCampoModelChange(i, 'cantidad', $event)"
                 />
               </label>
               <label>
                 Precio/kg
                 <input
-                  type="number"
-                  step="0.001"
-                  [value]="valorInput(linea.precioPorKilo)"
-                  (input)="onCampoInput($event, i, 'precio')"
-                  (blur)="onCampoBlur(i, 'precio')"
+                  [appNumero]="2"
+                  [ngModel]="linea.precioPorKilo"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="onCampoModelChange(i, 'precio', $event)"
                 />
               </label>
               <label>
                 Subtotal
                 <input
-                  type="number"
-                  step="0.001"
-                  [value]="valorInput(linea.subtotal)"
-                  (input)="onCampoInput($event, i, 'subtotal')"
-                  (blur)="onCampoBlur(i, 'subtotal')"
+                  [appNumero]="2"
+                  [ngModel]="linea.subtotal"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="onCampoModelChange(i, 'subtotal', $event)"
                 />
               </label>
               <button type="button" class="btn-quitar" (click)="quitarLinea(i)">Quitar</button>
 
+              @if (lineaDuplicada(linea)) {
+                <p class="warn">
+                  Esta materia prima ya está cargada en otro ítem. Unificá las cantidades en una sola
+                  línea.
+                </p>
+              }
               @if (linea.advertenciaLinea) {
                 <p class="warn">{{ linea.advertenciaLinea }}</p>
               }
@@ -309,10 +313,16 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
             <p>
               Suma subtotales:
               <strong [class.ok]="totalesCuadran()" [class.bad]="!totalesCuadran()">
-                $ {{ sumaSubtotales() | number: '1.3-3' }}
+                $ {{ sumaSubtotales() | number: '1.2-2' }}
               </strong>
-              / Total factura: <strong>$ {{ compra()!.totalFactura | number: '1.3-3' }}</strong>
+              / Total factura: <strong>$ {{ compra()!.totalFactura | number: '1.2-2' }}</strong>
             </p>
+            @if (hayMateriasDuplicadas()) {
+              <p class="warn">
+                Hay materias primas repetidas en el detalle. Cada materia prima debe figurar en un
+                solo ítem.
+              </p>
+            }
             @if (!totalesCuadran() && lineasValidas()) {
               <p class="warn">Los totales aún no coinciden (tolerancia ± $0,50).</p>
             }
@@ -329,6 +339,7 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
     }
   `,
   styles: [
+    GRANJA_VISTA_STYLES,
     `
       :host {
         display: block;
@@ -337,59 +348,80 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
         grid-column: 1 / -1;
       }
       .formulario-cabecera {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        align-items: flex-end;
+        align-items: end;
       }
       .fila-proveedor {
-        display: flex;
-        flex-wrap: wrap;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
         gap: 1rem;
-        width: 100%;
       }
       label {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
+        gap: 0.35rem;
         font-size: 0.85rem;
+        color: var(--reforma-text-dim);
+      }
+      label > span,
+      label {
+        color: var(--reforma-text-dim);
       }
       label.ancho {
-        flex: 1;
-        min-width: 240px;
+        grid-column: 1 / -1;
       }
       label.autocomplete {
         position: relative;
-        min-width: 220px;
       }
-      input {
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        min-width: 100px;
+      input,
+      input[type='number'],
+      input[type='date'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.6rem 0.75rem;
+        color: var(--reforma-text);
+        background: var(--glass-bg-strong);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      input::placeholder {
+        color: var(--reforma-text-faint);
+      }
+      input:focus {
+        border-color: var(--reforma-accent);
+        box-shadow: 0 0 0 3px var(--reforma-accent-soft);
       }
       .dropdown {
         position: absolute;
-        z-index: 10;
+        z-index: 30;
         top: 100%;
         left: 0;
         right: 0;
-        margin: 0;
-        padding: 0;
+        margin: 0.25rem 0 0;
+        padding: 0.25rem;
         list-style: none;
-        background: white;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        max-height: 180px;
+        background: var(--opaque-surface);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        max-height: 240px;
         overflow-y: auto;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        box-shadow: var(--glass-shadow);
+        color: var(--reforma-text);
       }
       .dropdown li {
-        padding: 0.4rem 0.55rem;
+        padding: 0.5rem 0.7rem;
+        border-radius: 8px;
         cursor: pointer;
+        color: var(--reforma-text);
       }
       .dropdown li:hover {
-        background: #ecfdf5;
+        background: var(--reforma-accent-soft);
+        color: #ede9fe;
       }
       .tabla-readonly {
         width: 100%;
@@ -398,48 +430,67 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
       }
       .tabla-readonly th,
       .tabla-readonly td {
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.75rem;
         text-align: left;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid var(--glass-border);
+        color: var(--reforma-text);
       }
       .tabla-readonly th {
-        font-size: 0.75rem;
-        color: #6b7280;
+        font-size: 0.78rem;
+        color: var(--reforma-text-dim);
         font-weight: 600;
+        background: rgba(255, 255, 255, 0.04);
       }
       .totales-vista {
         margin-top: 0.75rem;
         font-size: 0.9rem;
+        color: var(--reforma-text-dim);
+      }
+      .totales-vista strong {
+        color: var(--reforma-text);
       }
       .linea {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
         gap: 0.75rem;
-        align-items: flex-end;
+        align-items: end;
         padding: 1rem 0;
-        border-bottom: 1px solid #e5e7eb;
+        border-bottom: 1px solid var(--glass-border);
       }
       .mp-autocomplete {
-        display: flex;
-        flex-wrap: wrap;
+        grid-column: span 2;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
         gap: 0.75rem;
       }
       .btn-agregar,
       .btn-quitar {
-        padding: 0.45rem 0.9rem;
-        border: none;
-        border-radius: 4px;
+        padding: 0.5rem 0.9rem;
+        border-radius: 8px;
         cursor: pointer;
+        font: inherit;
         font-size: 0.85rem;
+        font-weight: 600;
+        transition: filter 0.12s ease, background 0.12s ease, border-color 0.12s ease;
       }
       .btn-agregar {
-        background: #374151;
-        color: white;
+        color: var(--reforma-text);
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
         margin-top: 1rem;
       }
+      .btn-agregar:hover:not(:disabled) {
+        background: var(--glass-bg-hover);
+        border-color: var(--glass-border-strong);
+      }
       .btn-quitar {
-        background: #b91c1c;
-        color: white;
+        color: #fecaca;
+        background: rgba(248, 113, 113, 0.12);
+        border: 1px solid rgba(248, 113, 113, 0.35);
+      }
+      .btn-quitar:hover:not(:disabled) {
+        background: rgba(248, 113, 113, 0.2);
+        border-color: rgba(248, 113, 113, 0.55);
       }
       .btn-agregar:disabled,
       .btn-quitar:disabled {
@@ -449,21 +500,25 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
       .totales {
         margin-top: 1rem;
         padding-top: 1rem;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--glass-border);
+        color: var(--reforma-text-dim);
+      }
+      .totales strong,
+      .totales-vista strong {
+        color: var(--reforma-text);
       }
       .ok {
-        color: #166534;
+        color: #bbf7d0;
       }
       .bad {
-        color: #b91c1c;
+        color: #fecaca;
       }
       .warn {
-        color: #b45309;
+        color: #fde68a;
         font-size: 0.85rem;
         width: 100%;
       }
     `,
-    GRANJA_VISTA_STYLES,
   ],
 })
 export class CompraDetalleComponent implements OnInit {
@@ -472,6 +527,16 @@ export class CompraDetalleComponent implements OnInit {
 
   readonly compra = signal<CompraCompleta | null>(null);
   readonly lineas = signal<LineaDetalleUi[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly lineasOrdenadas = computed(() =>
+    this.orden.ordenar(this.lineas(), {
+      codigo: (l) => l.codigo,
+      nombre: (l) => l.nombre,
+      cantidad: (l) => l.cantidadKg,
+      precio: (l) => l.precioPorKilo,
+      subtotal: (l) => l.subtotal,
+    }),
+  );
   readonly materiasPrimas = signal<MateriaPrima[]>([]);
   readonly proveedores = signal<Proveedor[]>([]);
   readonly cargando = signal(true);
@@ -531,8 +596,25 @@ export class CompraDetalleComponent implements OnInit {
     );
   });
 
+  /** Ids de materias primas que aparecen en más de un ítem del detalle. */
+  readonly idsMateriaDuplicados = computed(() => {
+    const conteo = new Map<number, number>();
+    for (const linea of this.lineas()) {
+      if (linea.idMateriaPrima == null) continue;
+      conteo.set(linea.idMateriaPrima, (conteo.get(linea.idMateriaPrima) ?? 0) + 1);
+    }
+    const duplicados = new Set<number>();
+    for (const [id, veces] of conteo) {
+      if (veces > 1) duplicados.add(id);
+    }
+    return duplicados;
+  });
+
+  readonly hayMateriasDuplicadas = computed(() => this.idsMateriaDuplicados().size > 0);
+
   readonly puedeGuardarDetalle = computed(() => {
     if (!this.lineasValidas()) return false;
+    if (this.hayMateriasDuplicadas()) return false;
     return !this.lineasConMateria().some((l) =>
       l.advertenciaLinea?.includes('fuera de tolerancia'),
     );
@@ -562,7 +644,7 @@ export class CompraDetalleComponent implements OnInit {
     });
   }
 
-  cargarCompra(): void {
+  cargarCompra(postCarga?: () => void): void {
     this.cargando.set(true);
     this.api.getCompra(this.idGranja, this.idCompra).subscribe({
       next: (c) => {
@@ -572,6 +654,7 @@ export class CompraDetalleComponent implements OnInit {
         this.editandoCabecera.set(false);
         this.editandoDetalle.set(false);
         this.cargando.set(false);
+        postCarga?.();
       },
       error: (err: HttpErrorResponse) => {
         this.errorCabecera.set(mensajeErrorHttp(err, 'No se pudo cargar la compra'));
@@ -612,12 +695,7 @@ export class CompraDetalleComponent implements OnInit {
 
     const total = this.totalFactura!;
     const hayLineas = this.lineasConMateria().length > 0;
-    if (hayLineas && !dentroToleranciaCompra(total, this.sumaSubtotales())) {
-      this.conflictoCabecera.set(
-        'El total de la cabecera no coincide con la suma del detalle. Editá la sección Detalle para ajustar los ítems.',
-      );
-      return;
-    }
+    const deberiaAjustarDetalle = hayLineas && !dentroToleranciaCompra(total, this.sumaSubtotales());
 
     this.conflictoCabecera.set(null);
     this.guardando.set(true);
@@ -633,8 +711,7 @@ export class CompraDetalleComponent implements OnInit {
       .subscribe({
         next: () => {
           this.guardando.set(false);
-          this.editandoCabecera.set(false);
-          this.cargarCompra();
+          this.cargarCompra(deberiaAjustarDetalle ? () => this.editarDetalle() : undefined);
         },
         error: (err: HttpErrorResponse) => {
           this.guardando.set(false);
@@ -670,12 +747,14 @@ export class CompraDetalleComponent implements OnInit {
   guardarDetalle(): void {
     if (!this.puedeGuardarDetalle()) return;
 
-    if (!this.totalesCuadran()) {
+    if (this.hayMateriasDuplicadas()) {
       this.conflictoDetalle.set(
-        'La suma de subtotales no coincide con el total de la cabecera. Editá la sección Cabecera para ajustar el total, o modificá los ítems del detalle.',
+        'Hay materias primas repetidas en el detalle. Cada materia prima debe figurar en un solo ítem; unificá las cantidades en una sola línea.',
       );
       return;
     }
+
+    const deberiaAjustarCabecera = !this.totalesCuadran();
 
     this.conflictoDetalle.set(null);
     const body = {
@@ -691,8 +770,7 @@ export class CompraDetalleComponent implements OnInit {
     this.api.guardarCompraDetalle(this.idGranja, this.idCompra, body).subscribe({
       next: () => {
         this.guardando.set(false);
-        this.editandoDetalle.set(false);
-        this.cargarCompra();
+        this.cargarCompra(deberiaAjustarCabecera ? () => this.editarCabecera() : undefined);
       },
       error: (err: HttpErrorResponse) => {
         this.guardando.set(false);
@@ -799,24 +877,16 @@ export class CompraDetalleComponent implements OnInit {
     this.mpAbiertoIndex.set(null);
   }
 
-  onCampoInput(
-    event: Event,
+  onCampoModelChange(
     index: number,
     campo: 'cantidad' | 'precio' | 'subtotal',
+    valor: number | null,
   ): void {
-    const raw = (event.target as HTMLInputElement).value;
-    const valor = raw.trim() === '' ? null : Number(raw);
     this.actualizarCampoLinea(index, campo, valor);
   }
 
-  onCampoBlur(index: number, campo: 'cantidad' | 'precio' | 'subtotal'): void {
-    const linea = this.lineas()[index];
-    if (!linea) return;
-    this.actualizarCampoLinea(index, campo, linea[this.campoLineaKey(campo)]);
-  }
-
-  valorInput(valor: number | null): string | number {
-    return valor ?? '';
+  lineaDuplicada(linea: LineaDetalleUi): boolean {
+    return linea.idMateriaPrima != null && this.idsMateriaDuplicados().has(linea.idMateriaPrima);
   }
 
   agregarLinea(): void {

@@ -1,8 +1,5 @@
-import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe, registerLocaleData } from '@angular/common';
-import localeEsAr from '@angular/common/locales/es-AR';
-
-registerLocaleData(localeEsAr);
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -10,6 +7,13 @@ import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { InventarioItem } from '../../../data/models/inventario.model';
 import { MateriaPrima } from '../../../data/models/materia-prima.model';
+import { KpiCardComponent } from '../shared/kpi-card.component';
+import { ChartCardComponent } from '../shared/chart-card.component';
+import { ApexChartComponent } from '../shared/apex-chart.component';
+import { barChart, donutChart } from '../shared/apex-charts';
+import { topConOtros } from '../shared/panel-utils';
+import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 interface LineaInicializacion {
   idMateriaPrima: number | null;
@@ -19,79 +23,94 @@ interface LineaInicializacion {
   precioInicial: number | null;
 }
 
+type OrdenInicializacion = 'nombre' | 'codigo';
+
 @Component({
   selector: 'app-inventario',
   standalone: true,
-  imports: [DecimalPipe, FormsModule],
-  providers: [{ provide: LOCALE_ID, useValue: 'es-AR' }],
+  imports: [
+    DecimalPipe,
+    FormsModule,
+    KpiCardComponent,
+    ChartCardComponent,
+    ApexChartComponent,
+    NumeroFormatoDirective,
+  ],
   template: `
     <header class="toolbar">
       <div>
-        <h2>Inventario</h2>
-        <p class="sub">Cantidades y valores de las materias primas registradas.</p>
+        <h2 class="reforma-page-title">Inventario</h2>
+        <p class="sub text-dim">Cantidades y valores de las materias primas registradas.</p>
       </div>
       <div class="acciones-top">
         @if (!inicializado()) {
-          <button type="button" class="btn primary" (click)="abrirInicializacion()">
-            Inicializar inventario
+          <button type="button" class="reforma-btn" (click)="abrirInicializacion()">
+            <i class="pi pi-sliders-h"></i> Inicializar inventario
           </button>
         } @else {
-          <button type="button" class="btn" (click)="recalcular()" [disabled]="cargando()">
-            Recalcular
+          <button type="button" class="reforma-btn-ghost" (click)="recalcular()" [disabled]="cargando()">
+            <i class="pi pi-refresh"></i> Recalcular
           </button>
-          <button type="button" class="btn danger" (click)="vaciar()" [disabled]="cargando()">
-            Vaciar inventario
+          <button type="button" class="reforma-btn-danger" (click)="vaciar()" [disabled]="cargando()">
+            <i class="pi pi-trash"></i> Vaciar inventario
           </button>
         }
       </div>
     </header>
 
     @if (resumen(); as r) {
-      <section class="resumen">
-        <article>
-          <span class="label">Materias primas</span>
-          <span class="valor">{{ r.totalMaterias }}</span>
-        </article>
-        <article>
-          <span class="label">Toneladas en stock</span>
-          <span class="valor">{{ r.toneladas | number: '1.0-2' : 'es-AR' }} t</span>
-        </article>
-        <article>
-          <span class="label">Valor total del stock</span>
-          <span class="valor">$ {{ r.valorTotal | number: '1.2-2' }}</span>
-        </article>
-        <article>
-          <span class="label">Merma acumulada</span>
-          <span class="valor">{{ r.mermaTotal | number: '1.3-3' }} kg</span>
-        </article>
+      <section class="rf-grid-kpis">
+        <reforma-kpi-card style="--rf-i: 0" icon="pi-box" label="Materias con stock" [value]="r.totalMaterias | number: '1.0-0'" />
+        <reforma-kpi-card style="--rf-i: 1" icon="pi-database" label="Toneladas en stock" [value]="(r.toneladas | number: '1.0-2') + ' t'" accent="#06b6d4" />
+        <reforma-kpi-card style="--rf-i: 2" icon="pi-dollar" label="Valor total del stock" [value]="'$ ' + (r.valorTotal | number: '1.0-0')" />
+        <reforma-kpi-card style="--rf-i: 3" icon="pi-exclamation-triangle" label="Merma acumulada" [value]="(r.mermaTotal | number: '1.0-2') + ' kg'" accent="#fbbf24" />
+      </section>
+
+      <section class="rf-grid-halves">
+        <reforma-chart-card
+          title="Existencias por materia (kg)"
+          icon="pi-chart-pie"
+          [empty]="existencias().valores.length === 0"
+          emptyText="Sin existencias cargadas"
+        >
+          <reforma-apex [options]="chartExistencias()" />
+        </reforma-chart-card>
+        <reforma-chart-card
+          title="Valor de stock por materia"
+          icon="pi-chart-bar"
+          [empty]="valorStock().valores.length === 0"
+          emptyText="Sin valor de stock para mostrar"
+        >
+          <reforma-apex [options]="chartValor()" />
+        </reforma-chart-card>
       </section>
     }
 
     @if (cargando()) {
-      <p>Cargando inventario…</p>
+      <p class="reforma-empty">Cargando inventario…</p>
     } @else if (inventario().length === 0) {
-      <p class="vacio">
-        No hay materias primas activas en el catalogo. Registralas primero en Materias primas.
+      <p class="reforma-empty">
+        No hay materias primas activas en el catálogo. Registralas primero en Materias primas.
       </p>
     } @else {
-      <div class="tabla-wrap">
-        <table>
+      <div class="reforma-table-wrap">
+        <table class="reforma-table">
           <thead>
             <tr>
-              <th>Codigo</th>
-              <th>Materia prima</th>
-              <th class="num">Precio (vigente)</th>
-              <th class="num">Cant. acumulada</th>
-              <th class="num">Cant. en sistema</th>
-              <th class="num">Cant. real</th>
-              <th class="num">Merma</th>
-              <th class="num">Valor de stock</th>
-              <th class="num">Precio almacen</th>
+              <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Código</th>
+              <th class="sortable" [class.is-asc]="orden.esAsc('nombre')" [class.is-desc]="orden.esDesc('nombre')" (click)="orden.alternar('nombre')">Materia prima</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('precio')" [class.is-desc]="orden.esDesc('precio')" (click)="orden.alternar('precio')">Precio (vigente)</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('acumulada')" [class.is-desc]="orden.esDesc('acumulada')" (click)="orden.alternar('acumulada')">Cant. acumulada</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('sistema')" [class.is-desc]="orden.esDesc('sistema')" (click)="orden.alternar('sistema')">Cant. en sistema</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('real')" [class.is-desc]="orden.esDesc('real')" (click)="orden.alternar('real')">Cant. real</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('merma')" [class.is-desc]="orden.esDesc('merma')" (click)="orden.alternar('merma')">Merma</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('valor')" [class.is-desc]="orden.esDesc('valor')" (click)="orden.alternar('valor')">Valor de stock</th>
+              <th class="num sortable" [class.is-asc]="orden.esAsc('almacen')" [class.is-desc]="orden.esDesc('almacen')" (click)="orden.alternar('almacen')">Precio almacén</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            @for (i of inventario(); track i.idMateriaPrima) {
+            @for (i of inventarioOrdenado(); track i.idMateriaPrima) {
               <tr [class.alerta]="i.cantidadReal <= 0">
                 <td>{{ i.codigoMateriaPrima }}</td>
                 <td>{{ i.nombreMateriaPrima }}</td>
@@ -104,13 +123,13 @@ interface LineaInicializacion {
                   [class.merma-pos]="mermaKg(i) > 0"
                   [class.merma-neg]="mermaKg(i) < 0"
                 >
-                  {{ mermaKg(i) | number: '1.3-3' : 'es-AR' }} kg
+                  {{ mermaKg(i) | number: '1.3-3' }} kg
                 </td>
                 <td class="num">$ {{ i.valorStock | number: '1.2-2' }}</td>
                 <td class="num">$ {{ i.precioAlmacen | number: '1.3-3' }}</td>
                 <td>
-                  <button type="button" class="link" (click)="abrirEdicion(i)">
-                    Editar cantidad real
+                  <button type="button" class="reforma-btn-ghost reforma-btn-sm" (click)="abrirEdicion(i)">
+                    <i class="pi pi-pencil"></i> Editar real
                   </button>
                 </td>
               </tr>
@@ -121,35 +140,35 @@ interface LineaInicializacion {
     }
 
     @if (error()) {
-      <p class="error">{{ error() }}</p>
+      <p class="reforma-alert reforma-alert-error"><i class="pi pi-exclamation-circle"></i> {{ error() }}</p>
     }
 
     <!-- Modal: editar cantidad real -->
     @if (modoEdicion(); as e) {
       <div class="overlay" (click)="cerrarEdicion()"></div>
-      <div class="modal" role="dialog" aria-modal="true">
-        <h3>Cantidad real - {{ e.nombreMateriaPrima }}</h3>
-        <p class="mini">
-          Sistema: {{ e.cantidadSistema | number: '1.3-3' }} kg | Precio vigente: $
+      <div class="modal glass-card-strong" role="dialog" aria-modal="true">
+        <h3>Cantidad real — {{ e.nombreMateriaPrima }}</h3>
+        <p class="mini text-dim">
+          Sistema: {{ e.cantidadSistema | number: '1.3-3' }} kg · Precio vigente: $
           {{ e.precioPorKilo | number: '1.3-3' }}
         </p>
-        <label>
-          Cantidad real (kg)
-          <input type="number" min="0" step="0.001" [(ngModel)]="cantidadRealEdit" />
+        <label class="reforma-field">
+          <span>Cantidad real (kg)</span>
+          <input class="reforma-input" [appNumero]="3" [(ngModel)]="cantidadRealEdit" />
         </label>
-        <label>
-          Observaciones (opcional)
-          <input type="text" [(ngModel)]="observacionesEdit" maxlength="200" />
+        <label class="reforma-field">
+          <span>Observaciones (opcional)</span>
+          <input class="reforma-input" type="text" [(ngModel)]="observacionesEdit" maxlength="200" />
         </label>
-        <p class="mini">
-          Merma resultante: {{ mermaPreview() | number: '1.3-3' }} kg | Valor stock previsto: $
+        <p class="mini text-dim">
+          Merma resultante: {{ mermaPreview() | number: '1.3-3' }} kg · Valor stock previsto: $
           {{ valorStockPreview() | number: '1.2-2' }}
         </p>
         <div class="acciones-modal">
-          <button type="button" class="btn" (click)="cerrarEdicion()">Cancelar</button>
+          <button type="button" class="reforma-btn-ghost" (click)="cerrarEdicion()">Cancelar</button>
           <button
             type="button"
-            class="btn primary"
+            class="reforma-btn"
             (click)="guardarCantidadReal()"
             [disabled]="guardandoEdicion()"
           >
@@ -162,75 +181,99 @@ interface LineaInicializacion {
     <!-- Modal: inicializar inventario -->
     @if (modoInicializar()) {
       <div class="overlay" (click)="cerrarInicializacion()"></div>
-      <div class="modal modal-ancho" role="dialog" aria-modal="true">
+      <div class="modal modal-ancho glass-card-strong" role="dialog" aria-modal="true">
         <h3>Inicializar inventario</h3>
-        <p class="mini">
-          Carga la cantidad y precio iniciales de cada materia prima. Esto se considera como punto
-          de partida y alimenta el calculo del precio almacen.
+        <p class="mini text-dim">
+          Cargá la cantidad y precio iniciales de cada materia prima. Es el punto de partida y
+          alimenta el cálculo del precio almacén. Los campos vacíos se inicializan en 0, por lo que
+          podés dejar en cero las materias primas sin existencias.
         </p>
-        <table class="ini">
-          <thead>
-            <tr>
-              <th>Codigo</th>
-              <th>Materia prima</th>
-              <th class="num">Cantidad inicial (kg)</th>
-              <th class="num">Precio inicial ($/kg)</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (linea of lineasIni(); track $index; let idx = $index) {
+        <div class="orden-toolbar" role="group" aria-label="Ordenar materias primas">
+          <span class="mini text-dim">Ordenar por:</span>
+          <button
+            type="button"
+            class="reforma-btn-ghost reforma-btn-sm"
+            [class.activo]="ordenIni() === 'nombre'"
+            [attr.aria-pressed]="ordenIni() === 'nombre'"
+            (click)="cambiarOrdenIni('nombre')"
+          >
+            <i class="pi pi-sort-alpha-down"></i> Nombre (A–Z)
+          </button>
+          <button
+            type="button"
+            class="reforma-btn-ghost reforma-btn-sm"
+            [class.activo]="ordenIni() === 'codigo'"
+            [attr.aria-pressed]="ordenIni() === 'codigo'"
+            (click)="cambiarOrdenIni('codigo')"
+          >
+            <i class="pi pi-sort-numeric-down"></i> Código (menor a mayor)
+          </button>
+        </div>
+        <div class="reforma-table-wrap ini-wrap">
+          <table class="reforma-table ini">
+            <thead>
               <tr>
-                <td>
-                  <input
-                    type="text"
-                    [ngModel]="linea.codigoMateriaPrima"
-                    (ngModelChange)="setCodigoLinea(idx, $event)"
-                    list="lista-mp-codigo"
-                    placeholder="Codigo"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    [ngModel]="linea.nombreMateriaPrima"
-                    (ngModelChange)="setNombreLinea(idx, $event)"
-                    list="lista-mp-nombre"
-                    placeholder="Nombre"
-                  />
-                </td>
-                <td class="num">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    [ngModel]="linea.cantidadInicial"
-                    (ngModelChange)="setCantidadLinea(idx, $event)"
-                  />
-                </td>
-                <td class="num">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    [ngModel]="linea.precioInicial"
-                    (ngModelChange)="setPrecioLinea(idx, $event)"
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    class="link danger-text"
-                    (click)="quitarLineaIni(idx)"
-                    [disabled]="lineasIni().length <= 1"
-                  >
-                    Quitar
-                  </button>
-                </td>
+                <th>Código</th>
+                <th>Materia prima</th>
+                <th class="num">Cantidad inicial (kg)</th>
+                <th class="num">Precio inicial ($/kg)</th>
+                <th></th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (linea of lineasIni(); track $index; let idx = $index) {
+                <tr>
+                  <td>
+                    <input
+                      class="reforma-input"
+                      type="text"
+                      [ngModel]="linea.codigoMateriaPrima"
+                      (ngModelChange)="setCodigoLinea(idx, $event)"
+                      list="lista-mp-codigo"
+                      placeholder="Código"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      class="reforma-input"
+                      type="text"
+                      [ngModel]="linea.nombreMateriaPrima"
+                      (ngModelChange)="setNombreLinea(idx, $event)"
+                      list="lista-mp-nombre"
+                      placeholder="Nombre"
+                    />
+                  </td>
+                  <td class="num">
+                    <input
+                      class="reforma-input"
+                      [appNumero]="3"
+                      [ngModel]="linea.cantidadInicial"
+                      (ngModelChange)="setCantidadLinea(idx, $event)"
+                    />
+                  </td>
+                  <td class="num">
+                    <input
+                      class="reforma-input"
+                      [appNumero]="3"
+                      [ngModel]="linea.precioInicial"
+                      (ngModelChange)="setPrecioLinea(idx, $event)"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="reforma-btn-danger reforma-btn-sm"
+                      (click)="quitarLineaIni(idx)"
+                      [disabled]="lineasIni().length <= 1"
+                    >
+                      Quitar
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
         <datalist id="lista-mp-codigo">
           @for (mp of materias(); track mp.id) {
             <option [value]="mp.codigoMateriaPrima"></option>
@@ -242,12 +285,14 @@ interface LineaInicializacion {
           }
         </datalist>
         <div class="acciones-modal">
-          <button type="button" class="btn" (click)="agregarLineaIni()">+ Agregar linea</button>
+          <button type="button" class="reforma-btn-ghost" (click)="agregarLineaIni()">
+            <i class="pi pi-plus"></i> Agregar línea
+          </button>
           <span class="spacer"></span>
-          <button type="button" class="btn" (click)="cerrarInicializacion()">Cancelar</button>
+          <button type="button" class="reforma-btn-ghost" (click)="cerrarInicializacion()">Cancelar</button>
           <button
             type="button"
-            class="btn primary"
+            class="reforma-btn"
             (click)="confirmarInicializacion()"
             [disabled]="guardandoIni() || !lineasIniValidas()"
           >
@@ -269,161 +314,115 @@ interface LineaInicializacion {
         align-items: flex-start;
         flex-wrap: wrap;
       }
-      h2 {
+      .reforma-page-title {
         margin: 0;
       }
       .sub {
         margin: 0.25rem 0 0;
-        color: #4b5563;
       }
       .acciones-top {
         display: flex;
         gap: 0.5rem;
-      }
-      .btn {
-        padding: 0.45rem 0.9rem;
-        border-radius: 4px;
-        border: 1px solid #166534;
-        background: white;
-        color: #166534;
-        cursor: pointer;
-      }
-      .btn.primary {
-        background: #166534;
-        color: white;
-      }
-      .btn.danger {
-        border-color: #b91c1c;
-        color: #b91c1c;
-      }
-      .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
+        flex-wrap: wrap;
       }
       .resumen {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 0.75rem;
-        margin: 1rem 0;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 1rem;
+        margin: 1.25rem 0;
       }
-      .resumen article {
-        background: #f9fafb;
-        padding: 0.75rem;
-        border-radius: 6px;
-        border: 1px solid #e5e7eb;
+      .kpi {
+        padding: 1rem 1.25rem;
         display: flex;
         flex-direction: column;
+        gap: 0.35rem;
       }
-      .resumen .label {
-        font-size: 0.8rem;
-        color: #6b7280;
+      .kpi .label {
+        font-size: 0.82rem;
+        color: var(--reforma-text-dim);
       }
-      .resumen .valor {
-        font-size: 1.1rem;
-        font-weight: 600;
+      .kpi .valor {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: var(--reforma-text);
       }
-      .tabla-wrap {
-        overflow-x: auto;
+      .kpi .valor small {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--reforma-text-dim);
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 0.5rem;
-      }
-      th,
-      td {
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #e5e7eb;
-        text-align: left;
+      .reforma-table td {
         white-space: nowrap;
       }
-      th.num,
-      td.num {
-        text-align: right;
-      }
       tr.alerta td {
-        background: #fff7ed;
+        background: rgba(248, 113, 113, 0.10);
       }
       .merma-pos {
-        color: #b45309;
+        color: var(--reforma-warn);
       }
       .merma-neg {
-        color: #1d4ed8;
+        color: var(--reforma-cyan);
       }
-      button.link {
-        color: #166534;
-        background: none;
-        border: none;
-        padding: 0;
-        cursor: pointer;
-        text-decoration: underline;
-        font-size: inherit;
-      }
-      button.danger-text {
-        color: #b91c1c;
-      }
-      .vacio {
-        color: #6b7280;
-      }
-      .error {
-        color: #b91c1c;
-      }
+      /* Modales */
       .overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: 10;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+        z-index: 40;
       }
       .modal {
         position: fixed;
         top: 10vh;
         left: 50%;
         transform: translateX(-50%);
-        background: white;
-        padding: 1.25rem;
-        border-radius: 8px;
-        width: min(420px, 92vw);
-        z-index: 11;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        padding: 1.5rem;
+        width: min(440px, 92vw);
+        z-index: 41;
       }
       .modal-ancho {
-        width: min(900px, 96vw);
+        width: min(920px, 96vw);
         max-height: 80vh;
         overflow: auto;
       }
       .modal h3 {
         margin: 0 0 0.5rem;
+        color: var(--reforma-text);
       }
-      .modal label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin-top: 0.75rem;
-        font-size: 0.9rem;
-      }
-      .modal input {
-        padding: 0.4rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+      .modal .reforma-field {
+        margin-top: 0.85rem;
       }
       .mini {
         font-size: 0.85rem;
-        color: #6b7280;
+        margin: 0.35rem 0;
       }
       .acciones-modal {
         display: flex;
         gap: 0.5rem;
         justify-content: flex-end;
-        margin-top: 1rem;
+        align-items: center;
+        margin-top: 1.25rem;
       }
       .acciones-modal .spacer {
         flex: 1;
       }
+      .ini-wrap {
+        margin-top: 0.75rem;
+      }
+      .orden-toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.85rem;
+      }
+      .orden-toolbar .reforma-btn-sm.activo {
+        background: var(--reforma-accent, #06b6d4);
+        border-color: var(--reforma-accent, #06b6d4);
+        color: #0b1120;
+      }
       table.ini input {
-        width: 100%;
-        padding: 0.3rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+        margin: 0;
       }
     `,
   ],
@@ -433,6 +432,20 @@ export class InventarioComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly inventario = signal<InventarioItem[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly inventarioOrdenado = computed(() =>
+    this.orden.ordenar(this.inventario(), {
+      codigo: (i) => i.codigoMateriaPrima,
+      nombre: (i) => i.nombreMateriaPrima,
+      precio: (i) => i.precioPorKilo,
+      acumulada: (i) => i.cantidadAcumulada,
+      sistema: (i) => i.cantidadSistema,
+      real: (i) => i.cantidadReal,
+      merma: (i) => this.mermaKg(i),
+      valor: (i) => i.valorStock,
+      almacen: (i) => i.precioAlmacen,
+    }),
+  );
   readonly inicializado = signal(false);
   readonly materias = signal<MateriaPrima[]>([]);
   readonly cargando = signal(true);
@@ -446,6 +459,7 @@ export class InventarioComponent implements OnInit {
   readonly modoInicializar = signal(false);
   readonly lineasIni = signal<LineaInicializacion[]>([this.lineaVacia()]);
   readonly guardandoIni = signal(false);
+  readonly ordenIni = signal<OrdenInicializacion>('nombre');
 
   readonly resumen = computed(() => {
     const items = this.inventario();
@@ -465,6 +479,42 @@ export class InventarioComponent implements OnInit {
       mermaTotal,
     };
   });
+
+  // Distribución de existencias (kg) y valor de stock, derivadas del inventario.
+  readonly existencias = computed(() =>
+    topConOtros(
+      this.inventario()
+        .filter((i) => i.cantidadReal > 0)
+        .map((i) => ({ label: i.codigoMateriaPrima, valor: i.cantidadReal })),
+      8,
+    ),
+  );
+  readonly valorStock = computed(() =>
+    topConOtros(
+      this.inventario()
+        .filter((i) => i.valorStock > 0)
+        .map((i) => ({ label: i.codigoMateriaPrima, valor: i.valorStock })),
+      9,
+    ),
+  );
+  readonly chartExistencias = computed(() =>
+    donutChart({
+      labels: this.existencias().labels,
+      series: this.existencias().valores,
+      totalLabel: 'Total kg',
+      totalFormatter: (t) => Math.round(t).toLocaleString('en-US') + ' kg',
+      height: 280,
+    }),
+  );
+  readonly chartValor = computed(() =>
+    barChart({
+      categories: this.valorStock().labels,
+      series: [{ name: 'Valor', data: this.valorStock().valores }],
+      distributed: true,
+      money: true,
+      height: 280,
+    }),
+  );
 
   readonly mermaPreview = computed(() => {
     const item = this.modoEdicion();
@@ -519,7 +569,7 @@ export class InventarioComponent implements OnInit {
   }
 
   vaciar(): void {
-    if (!confirm('Esto eliminara todo el inventario y la inicializacion. Continuar?')) return;
+    if (!confirm('Esto eliminará todo el inventario y la inicialización. ¿Continuar?')) return;
     this.cargando.set(true);
     this.api.vaciarInventario(this.idGranja).subscribe({
       next: () => this.recargar(),
@@ -579,10 +629,42 @@ export class InventarioComponent implements OnInit {
       codigoMateriaPrima: mp.codigoMateriaPrima,
       nombreMateriaPrima: mp.nombreMateriaPrima,
       cantidadInicial: 0,
-      precioInicial: mp.precioPorKilo > 0 ? mp.precioPorKilo : null,
+      precioInicial: mp.precioPorKilo > 0 ? mp.precioPorKilo : 0,
     }));
-    this.lineasIni.set(lineas.length > 0 ? lineas : [this.lineaVacia()]);
+    const lineasIniciales = lineas.length > 0 ? lineas : [this.lineaVacia()];
+    this.lineasIni.set(this.ordenarLineas(lineasIniciales, this.ordenIni()));
     this.modoInicializar.set(true);
+  }
+
+  /** Cambia el criterio de ordenamiento del listado y reordena las líneas cargadas. */
+  cambiarOrdenIni(orden: OrdenInicializacion): void {
+    this.ordenIni.set(orden);
+    this.lineasIni.update((lineas) => this.ordenarLineas(lineas, orden));
+  }
+
+  /**
+   * Ordena las líneas según el criterio elegido. El código se compara de forma natural
+   * (numérica) para que "MP2" quede antes que "MP10". Las líneas sin materia prima asignada
+   * quedan al final para no interferir con la edición manual.
+   */
+  private ordenarLineas(
+    lineas: LineaInicializacion[],
+    orden: OrdenInicializacion,
+  ): LineaInicializacion[] {
+    return [...lineas].sort((a, b) => {
+      const aAsignada = a.idMateriaPrima != null;
+      const bAsignada = b.idMateriaPrima != null;
+      if (aAsignada !== bAsignada) return aAsignada ? -1 : 1;
+      if (orden === 'codigo') {
+        return a.codigoMateriaPrima.localeCompare(b.codigoMateriaPrima, 'es', {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      }
+      return a.nombreMateriaPrima.localeCompare(b.nombreMateriaPrima, 'es', {
+        sensitivity: 'base',
+      });
+    });
   }
 
   cerrarInicializacion(): void {
@@ -655,36 +737,28 @@ export class InventarioComponent implements OnInit {
     const lineas = this.lineasIni();
     if (lineas.length === 0) return false;
     const idsVistos = new Set<number>();
-    let hayLineaUtil = false;
+    let hayLineaConMateria = false;
     for (const linea of lineas) {
       if (linea.idMateriaPrima == null) continue;
-      if (linea.cantidadInicial == null || linea.cantidadInicial < 0) return false;
-      if (linea.precioInicial == null || linea.precioInicial < 0) return false;
-      if (linea.cantidadInicial === 0 && linea.precioInicial === 0) continue;
+      // Los campos vacíos se interpretan como 0; solo se rechazan valores negativos.
+      if ((linea.cantidadInicial ?? 0) < 0) return false;
+      if ((linea.precioInicial ?? 0) < 0) return false;
       if (idsVistos.has(linea.idMateriaPrima)) return false;
       idsVistos.add(linea.idMateriaPrima);
-      hayLineaUtil = true;
+      hayLineaConMateria = true;
     }
-    return hayLineaUtil;
+    return hayLineaConMateria;
   }
 
   confirmarInicializacion(): void {
     if (!this.lineasIniValidas()) return;
-    const lineasPayload = this.lineasIni().filter(
-      (l) =>
-        l.idMateriaPrima != null &&
-        l.cantidadInicial != null &&
-        l.precioInicial != null &&
-        l.cantidadInicial >= 0 &&
-        l.precioInicial >= 0 &&
-        (l.cantidadInicial > 0 || l.precioInicial > 0),
-    );
+    const lineasPayload = this.lineasIni().filter((l) => l.idMateriaPrima != null);
     if (lineasPayload.length === 0) return;
     const payload = {
       lineas: lineasPayload.map((l) => ({
         idMateriaPrima: l.idMateriaPrima!,
-        cantidadInicial: l.cantidadInicial!,
-        precioInicial: l.precioInicial!,
+        cantidadInicial: l.cantidadInicial ?? 0,
+        precioInicial: l.precioInicial ?? 0,
       })),
     };
     this.guardandoIni.set(true);

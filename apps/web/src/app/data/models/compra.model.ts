@@ -64,7 +64,7 @@ export interface LineaDetalleUi {
   ultimoCampoEditado: 'cantidad' | 'precio' | 'subtotal' | null;
 }
 
-export const COMPRA_DECIMALES = 3;
+export const COMPRA_DECIMALES = 2;
 export const COMPRA_TOLERANCIA = 0.5;
 
 export function redondearCompra(valor: number): number {

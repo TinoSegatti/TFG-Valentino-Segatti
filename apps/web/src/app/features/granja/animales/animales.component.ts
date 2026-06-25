@@ -1,12 +1,19 @@
-import { Component, inject, OnInit, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { debounceTime, Subject } from 'rxjs';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { Animal, AnimalRequest } from '../../../data/models/animal.model';
 import { CsvImportResult, descargarBlobComoArchivo } from '../../../data/models/csv.model';
 import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
+import { KpiCardComponent } from '../shared/kpi-card.component';
+import { ChartCardComponent } from '../shared/chart-card.component';
+import { ApexChartComponent } from '../shared/apex-chart.component';
+import { barChart, donutChart } from '../shared/apex-charts';
+import { topConOtros } from '../shared/panel-utils';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 /**
  * Listado, alta rápida y baja lógica del catálogo de Animales (RF-ANI-001 / RF-ANI-002).
@@ -15,9 +22,44 @@ import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
 @Component({
   selector: 'app-animales',
   standalone: true,
-  imports: [FormsModule, CatalogoCsvBarComponent],
+  imports: [
+    FormsModule,
+    DecimalPipe,
+    CatalogoCsvBarComponent,
+    KpiCardComponent,
+    ChartCardComponent,
+    ApexChartComponent,
+  ],
   template: `
-    <h2>Animales</h2>
+    <h2 class="reforma-page-title">Animales</h2>
+
+    <section class="rf-grid-kpis">
+      <reforma-kpi-card style="--rf-i: 0" icon="pi-pause" label="Animales activos" [value]="stats().total | number: '1.0-0'" />
+      <reforma-kpi-card style="--rf-i: 1" icon="pi-tags" label="Categorías" [value]="stats().categorias | number: '1.0-0'" accent="#06b6d4" />
+      <reforma-kpi-card style="--rf-i: 2" icon="pi-comment" label="Con observaciones" [value]="stats().conObs | number: '1.0-0'" accent="#f472b6" />
+      <reforma-kpi-card style="--rf-i: 3" icon="pi-question-circle" label="Sin categoría" [value]="stats().sinCategoria | number: '1.0-0'" accent="#fbbf24" />
+    </section>
+
+    <section class="rf-grid-halves">
+      <reforma-chart-card
+        title="Distribución por categoría"
+        icon="pi-chart-pie"
+        [loading]="cargando()"
+        [empty]="!cargando() && porCategoria().valores.length === 0"
+        emptyText="Cargá animales para ver su distribución"
+      >
+        <reforma-apex [options]="chartDonut()" />
+      </reforma-chart-card>
+      <reforma-chart-card
+        title="Animales por categoría"
+        icon="pi-chart-bar"
+        [loading]="cargando()"
+        [empty]="!cargando() && porCategoria().valores.length === 0"
+        emptyText="Sin datos para mostrar"
+      >
+        <reforma-apex [options]="chartBar()" />
+      </reforma-chart-card>
+    </section>
 
     <app-catalogo-csv-bar
       #csvBar
@@ -28,88 +70,90 @@ import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
       (importar)="importarCsv($event)"
     />
 
-    <section class="alta">
-      <h3>Alta rápida</h3>
+    <section class="reforma-section alta">
+      <h3 class="reforma-section-title">Alta rápida</h3>
       <form (ngSubmit)="crear()" #f="ngForm">
-        <label>
-          Código
-          <input
-            name="codigo"
-            [(ngModel)]="form.codigoAnimal"
-            maxlength="50"
-            required
-          />
+        <label class="reforma-field">
+          <span>Código</span>
+          <input class="reforma-input" name="codigo" [(ngModel)]="form.codigoAnimal" maxlength="50" required />
         </label>
-        <label>
-          Descripción
-          <input
-            name="descripcion"
-            [(ngModel)]="form.descripcionAnimal"
-            maxlength="200"
-            required
-          />
+        <label class="reforma-field">
+          <span>Descripción</span>
+          <input class="reforma-input" name="descripcion" [(ngModel)]="form.descripcionAnimal" maxlength="200" required />
         </label>
-        <label>
-          Categoría
-          <input name="categoria" [(ngModel)]="form.categoriaAnimal" maxlength="100" />
+        <label class="reforma-field">
+          <span>Categoría</span>
+          <input class="reforma-input" name="categoria" [(ngModel)]="form.categoriaAnimal" maxlength="100" />
         </label>
-        <label class="full">
-          Observaciones
+        <label class="reforma-field full">
+          <span>Observaciones</span>
           <textarea
+            class="reforma-input"
             name="observaciones"
             [(ngModel)]="form.observaciones"
             maxlength="5000"
             rows="2"
           ></textarea>
         </label>
-        <button type="submit" [disabled]="creando() || f.invalid">Crear</button>
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
+        <button class="reforma-btn" type="submit" [disabled]="creando() || f.invalid">
+          <i class="pi pi-plus"></i> Crear
+        </button>
       </form>
+      @if (error()) {
+        <p class="reforma-alert reforma-alert-error">
+          <i class="pi pi-exclamation-circle"></i> {{ error() }}
+        </p>
+      }
     </section>
 
     <section class="lista">
       <header class="lista-header">
-        <h3>Activos ({{ items().length }})</h3>
-        <input
-          class="buscar"
-          type="search"
-          placeholder="Buscar por descripción…"
-          [ngModel]="filtro()"
-          (ngModelChange)="onFiltroChange($event)"
-        />
+        <h3 class="reforma-section-title">Activos ({{ items().length }})</h3>
+        <div class="buscar-wrap">
+          <i class="pi pi-search"></i>
+          <input
+            class="reforma-input buscar"
+            type="search"
+            placeholder="Buscar por descripción…"
+            [ngModel]="filtro()"
+            (ngModelChange)="onFiltroChange($event)"
+          />
+        </div>
       </header>
 
       @if (cargando()) {
-        <p>Cargando…</p>
+        <p class="reforma-empty">Cargando…</p>
       } @else if (items().length === 0) {
-        <p class="vacio">Todavía no cargaste ningún animal (o ninguno coincide con el filtro).</p>
+        <p class="reforma-empty">Todavía no cargaste ningún animal (o ninguno coincide con el filtro).</p>
       } @else {
-        <table>
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Descripción</th>
-              <th>Categoría</th>
-              <th>Observaciones</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (a of items(); track a.id) {
+        <div class="reforma-table-wrap">
+          <table class="reforma-table">
+            <thead>
               <tr>
-                <td>{{ a.codigoAnimal }}</td>
-                <td>{{ a.descripcionAnimal }}</td>
-                <td>{{ a.categoriaAnimal ?? '—' }}</td>
-                <td class="obs">{{ a.observaciones ?? '—' }}</td>
-                <td>
-                  <button type="button" class="danger" (click)="desactivar(a)">Dar de baja</button>
-                </td>
+                <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Código</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('descripcion')" [class.is-desc]="orden.esDesc('descripcion')" (click)="orden.alternar('descripcion')">Descripción</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('categoria')" [class.is-desc]="orden.esDesc('categoria')" (click)="orden.alternar('categoria')">Categoría</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('observaciones')" [class.is-desc]="orden.esDesc('observaciones')" (click)="orden.alternar('observaciones')">Observaciones</th>
+                <th></th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (a of itemsOrdenados(); track a.id) {
+                <tr>
+                  <td>{{ a.codigoAnimal }}</td>
+                  <td>{{ a.descripcionAnimal }}</td>
+                  <td>{{ a.categoriaAnimal ?? '—' }}</td>
+                  <td class="obs">{{ a.observaciones ?? '—' }}</td>
+                  <td class="acciones">
+                    <button type="button" class="reforma-btn-danger" (click)="desactivar(a)">
+                      <i class="pi pi-trash"></i> Dar de baja
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
     </section>
   `,
@@ -117,9 +161,6 @@ import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
     `
       :host {
         display: block;
-      }
-      h2 {
-        margin-top: 0;
       }
       .alta {
         margin-bottom: 2rem;
@@ -130,79 +171,55 @@ import { CatalogoCsvBarComponent } from '../shared/catalogo-csv-bar.component';
         gap: 1rem;
         align-items: flex-end;
       }
-      label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        font-size: 0.85rem;
+      .reforma-field {
+        flex: 1 1 12rem;
+        min-width: 9rem;
       }
-      label.full {
+      .reforma-field.full {
         flex: 1 1 100%;
       }
-      input,
-      textarea {
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+      textarea.reforma-input {
+        resize: vertical;
         font: inherit;
       }
-      textarea {
-        resize: vertical;
-      }
-      button {
-        padding: 0.5rem 1rem;
-        background: #166534;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      button.danger {
-        background: #b91c1c;
-      }
-      .error {
-        color: #b91c1c;
-        margin: 0.5rem 0 0;
-        flex: 1 1 100%;
-      }
-      .vacio {
-        color: #6b7280;
+      form .reforma-btn {
+        flex: 0 0 auto;
       }
       .lista-header {
         display: flex;
         align-items: center;
         gap: 1rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
       }
-      .lista-header h3 {
+      .lista-header .reforma-section-title {
         margin: 0;
         flex: 1;
       }
+      .buscar-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .buscar-wrap i {
+        position: absolute;
+        left: 0.7rem;
+        color: var(--reforma-text-faint);
+        pointer-events: none;
+      }
       .buscar {
         min-width: 240px;
-        padding: 0.4rem 0.5rem;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+        padding-left: 2rem;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 1rem;
-      }
-      th,
-      td {
-        padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #e5e7eb;
-        text-align: left;
-        vertical-align: top;
+      .lista .acciones {
+        text-align: right;
+        width: 1%;
+        white-space: nowrap;
       }
       td.obs {
         max-width: 280px;
         white-space: pre-wrap;
-        color: #4b5563;
+        color: var(--reforma-text-dim);
       }
     `,
   ],
@@ -212,6 +229,15 @@ export class AnimalesComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly items = signal<Animal[]>([]);
+  readonly orden = new OrdenTabla();
+  readonly itemsOrdenados = computed(() =>
+    this.orden.ordenar(this.items(), {
+      codigo: (a) => a.codigoAnimal,
+      descripcion: (a) => a.descripcionAnimal,
+      categoria: (a) => a.categoriaAnimal,
+      observaciones: (a) => a.observaciones,
+    }),
+  );
   readonly cargando = signal(true);
   readonly creando = signal(false);
   readonly error = signal<string | null>(null);
@@ -225,6 +251,46 @@ export class AnimalesComponent implements OnInit {
   private readonly busquedaPendiente = new Subject<string>();
 
   form: AnimalRequest = vacio();
+
+  readonly stats = computed(() => {
+    const items = this.items();
+    const cats = new Set(items.map((a) => a.categoriaAnimal?.trim()).filter(Boolean));
+    return {
+      total: items.length,
+      categorias: cats.size,
+      conObs: items.filter((a) => !!a.observaciones?.trim()).length,
+      sinCategoria: items.filter((a) => !a.categoriaAnimal?.trim()).length,
+    };
+  });
+
+  readonly porCategoria = computed(() => {
+    const acum = new Map<string, number>();
+    for (const a of this.items()) {
+      const label = a.categoriaAnimal?.trim() || 'Sin categoría';
+      acum.set(label, (acum.get(label) ?? 0) + 1);
+    }
+    return topConOtros(
+      [...acum.entries()].map(([label, v]) => ({ label, valor: v })),
+      8,
+    );
+  });
+
+  readonly chartDonut = computed(() =>
+    donutChart({
+      labels: this.porCategoria().labels,
+      series: this.porCategoria().valores,
+      totalLabel: 'Animales',
+      height: 280,
+    }),
+  );
+  readonly chartBar = computed(() =>
+    barChart({
+      categories: this.porCategoria().labels,
+      series: [{ name: 'Animales', data: this.porCategoria().valores }],
+      distributed: true,
+      height: 280,
+    }),
+  );
 
   private get idGranja(): string {
     return this.route.parent?.snapshot.paramMap.get('idGranja') ?? '';

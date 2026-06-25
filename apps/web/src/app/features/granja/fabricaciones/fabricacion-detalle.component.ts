@@ -11,6 +11,7 @@ import {
 } from '../../../data/models/fabricacion.model';
 import { FormulaResumen } from '../../../data/models/formula.model';
 import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
+import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
   selector: 'app-fabricacion-detalle',
@@ -234,14 +235,14 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
           <table>
             <thead>
               <tr>
-                <th>MP</th>
-                <th>Cantidad usada (kg)</th>
-                <th>Precio unit. (snapshot)</th>
-                <th>Costo parcial</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('mp')" [class.is-desc]="orden.esDesc('mp')" (click)="orden.alternar('mp')">MP</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('cantidad')" [class.is-desc]="orden.esDesc('cantidad')" (click)="orden.alternar('cantidad')">Cantidad usada (kg)</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('precio')" [class.is-desc]="orden.esDesc('precio')" (click)="orden.alternar('precio')">Precio unit. (snapshot)</th>
+                <th class="sortable" [class.is-asc]="orden.esAsc('costo')" [class.is-desc]="orden.esDesc('costo')" (click)="orden.alternar('costo')">Costo parcial</th>
               </tr>
             </thead>
             <tbody>
-              @for (l of lineas(); track l.id) {
+              @for (l of lineasOrdenadas(); track l.id) {
                 <tr>
                   <td>{{ l.nombreMateriaPrima }} ({{ l.codigoMateriaPrima }})</td>
                   <td>{{ l.cantidadUsada | number: '1.3-3' }}</td>
@@ -278,82 +279,120 @@ import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
     `
       :host {
         display: block;
-        max-width: 960px;
+        max-width: 60rem;
       }
       .formulario-cabecera {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
         gap: 1rem;
-        max-width: 480px;
+        max-width: 32rem;
       }
-      .formulario-cabecera label {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-      .fila-formula {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        margin-bottom: 1rem;
-      }
+      .formulario-cabecera label,
       .fila-formula label {
         display: flex;
         flex-direction: column;
-        gap: 0.25rem;
-        min-width: 180px;
+        gap: 0.35rem;
+        font-size: 0.85rem;
+        color: var(--reforma-text-dim);
+      }
+      .fila-formula {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
       }
       .autocomplete {
         position: relative;
-        flex: 1;
-        min-width: 240px;
       }
       .dropdown {
         position: absolute;
-        z-index: 10;
+        z-index: 30;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin: 0.25rem 0 0;
+        padding: 0.25rem;
         list-style: none;
-        margin: 0;
-        padding: 0;
-        background: white;
-        border: 1px solid #d1d5db;
-        width: 100%;
-        max-height: 200px;
+        background: var(--opaque-surface);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        max-height: 240px;
         overflow-y: auto;
+        box-shadow: var(--glass-shadow);
+        color: var(--reforma-text);
       }
       .dropdown li {
-        padding: 0.5rem;
+        padding: 0.5rem 0.7rem;
+        border-radius: 8px;
         cursor: pointer;
+        color: var(--reforma-text);
       }
       .dropdown li:hover {
-        background: #f3f4f6;
+        background: var(--reforma-accent-soft);
+        color: #ede9fe;
+      }
+      input,
+      input[type='number'],
+      input[type='date'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0.6rem 0.75rem;
+        color: var(--reforma-text);
+        background: var(--glass-bg-strong);
+        border: 1px solid var(--glass-border-strong);
+        border-radius: 10px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      input::placeholder {
+        color: var(--reforma-text-faint);
+      }
+      input:focus {
+        border-color: var(--reforma-accent);
+        box-shadow: 0 0 0 3px var(--reforma-accent-soft);
       }
       .incompleta {
-        color: #b45309;
+        color: #fde68a;
         font-size: 0.8rem;
       }
       .subtitulo {
         margin: 1rem 0 0.5rem;
         font-size: 0.95rem;
+        color: var(--reforma-text);
+        font-weight: 600;
       }
       table {
         width: 100%;
         border-collapse: collapse;
         margin: 0.5rem 0 1rem;
+        font-size: 0.9rem;
       }
       th,
       td {
-        padding: 0.5rem;
-        border-bottom: 1px solid #e5e7eb;
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid var(--glass-border);
         text-align: left;
+        color: var(--reforma-text);
+      }
+      th {
+        font-size: 0.78rem;
+        color: var(--reforma-text-dim);
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.04);
       }
       .totales {
         margin-top: 1rem;
         padding-top: 1rem;
-        border-top: 1px solid #e5e7eb;
+        border-top: 1px solid var(--glass-border);
+        color: var(--reforma-text-dim);
+      }
+      .totales strong {
+        color: var(--reforma-text);
       }
       .hint-inline {
-        color: #6b7280;
+        color: var(--reforma-text-faint);
         font-size: 0.85rem;
+        margin-left: 0.4rem;
       }
       .formula-readonly {
         margin-bottom: 0.5rem;
@@ -387,7 +426,16 @@ export class FabricacionDetalleComponent implements OnInit {
   veces = 1;
   mostrarFormulas = signal(false);
 
+  readonly orden = new OrdenTabla();
   lineas = computed(() => this.fabricacion()?.lineas ?? []);
+  lineasOrdenadas = computed(() =>
+    this.orden.ordenar(this.lineas(), {
+      mp: (l) => l.nombreMateriaPrima,
+      cantidad: (l) => l.cantidadUsada,
+      precio: (l) => l.precioUnitario,
+      costo: (l) => l.costoParcial,
+    }),
+  );
   costoUnitarioUi = computed(() => {
     const fab = this.fabricacion();
     if (!fab) return null;
