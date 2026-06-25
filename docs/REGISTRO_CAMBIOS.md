@@ -17,6 +17,60 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-06-23 — Inventario: Precio Almacén como costo promedio ponderado (acumuladores gasto/kilos)
+- **Autor/agente:** Cursor (Claude Opus 4.8)
+- **Qué:** se formalizó el cálculo de `t_inventario.precio_almacen` como costo promedio ponderado de
+  adquisición = **gasto acumulado / kilos acumulados**, donde la primera "iteración" del acumulador
+  es el valor del stock inicial (`cantidad_inicial × precio_inicial`) y cada compra REGISTRADA suma
+  su **subtotal** y sus kilos. El cálculo se reconstruye desde cero en cada recálculo, por lo que
+  editar o eliminar una factura se refleja automáticamente. No interviene el consumo por
+  fabricaciones ni el ajuste manual de stock.
+  - **Cambio principal:** el acumulador de gasto ahora usa `SUM(cd.subtotal)` (gasto real de la
+    línea) en vez de `SUM(cd.cantidadComprada × cd.precioUnitario)`, respetando la tolerancia de
+    redondeo con la que se carga el detalle de compra. Afecta `totalPorMateriaPrima` y
+    `sumarTotalesPorMateriaPrima` en `CompraDetalleRepository`.
+  - **Claridad:** en `InventarioRecalculoService.calcularValores` se hicieron explícitos los
+    acumuladores `gastoAcumulado` / `kilosAcumulados` con comentarios; se mejoró el Javadoc de
+    `InventarioCalculo.precioAlmacenPonderado` (parámetros renombrados a `gastoAcumulado` /
+    `kilosAcumulados`).
+  - **Doc nuevo:** [`PRECIO_ALMACEN.md`](PRECIO_ALMACEN.md) — flujo de información y lógica línea por
+    línea del algoritmo.
+- **Archivos principales:** `services/api-domain/.../compras/repository/CompraDetalleRepository.java`,
+  `services/api-domain/.../inventario/service/InventarioRecalculoService.java`,
+  `services/api-domain/.../inventario/support/InventarioCalculo.java`, `docs/PRECIO_ALMACEN.md`.
+- **Pendiente:** correr `make test-domain` en entorno con Docker (los tests unitarios mockean los
+  totales y siguen verdes; el IT usa `subtotal = cantidad × precio`, sin cambios de expectativa).
+
+### 2026-06-21 — Compras: anti-duplicado de materia prima en el detalle y formato monetario es-AR
+- **Autor/agente:** Cursor (Claude Opus 4.8)
+- **Qué:** dos arreglos en el módulo de compras.
+  - **Materia prima no repetible en un detalle de compra:** cargar la misma MP en dos ítems generaba doble cómputo de kilos/dinero en inventario, historial de precios duplicado y un precio vigente de catálogo ambiguo. Ahora se bloquea en dos capas:
+    - **Backend** (`CompraService.construirLineasValidadas`): se rechaza con **400** ("La materia prima X está repetida en el detalle…") usando un `Set<Long>` de ids vistos.
+    - **Frontend** (`compra-detalle.component.ts`): computed `idsMateriaDuplicados` / `hayMateriasDuplicadas`, aviso por ítem y aviso global, botón "Guardar" deshabilitado (`puedeGuardarDetalle`) y guard en `guardarDetalle()` con mensaje en `conflictoDetalle`.
+  - **Formato monetario es-AR:** los labels de precios mostraban formato de locale por defecto (`1,234.567`). Se registró `localeEsAr` y se agregó `{ provide: LOCALE_ID, useValue: 'es-AR' }` en `compra-detalle.component.ts` y `compras.component.ts`, de modo que los `DecimalPipe` ya existentes (con `$` antepuesto) rinden con separador de miles "." y decimales "," → **`$ 1.234,567`**.
+  - **Tests:** `CompraServiceTest` — el caso "factura 30M" se actualizó para usar dos MPs distintas (Maíz + Soja) y se agregó `guardarDetalle_materiaPrimaDuplicada` (espera 400). La integración (`ComprasIntegracionIT`) ya usaba MPs distintas.
+- **Archivos principales:** `services/api-domain/.../compras/service/CompraService.java` (+`CompraServiceTest`), `apps/web/.../features/granja/compras/{compra-detalle,compras}.component.ts`.
+- **Pendiente:** correr `make test-domain` y `make build` en entorno con Docker (no disponible localmente al momento del cambio); smoke visual del formato y del bloqueo de duplicados.
+
+### 2026-06-21 — Inventario: orden configurable de materias primas y precio/cantidad 0 en la inicialización
+- **Autor/agente:** Cursor (Claude Opus 4.8)
+- **Qué:** dos mejoras de UX en el modal de inicialización del inventario (`inventario.component.ts`), sin cambios de backend.
+  - **Orden configurable:** además del orden alfabético por nombre (A–Z, comportamiento por defecto que ya venía del backend `OrderByNombreMateriaPrimaAsc`), se agregó un control segmentado "Ordenar por: Nombre (A–Z) / Código (menor a mayor)". El reordenamiento es client-side sobre `lineasIni` vía `cambiarOrdenIni()` + `ordenarLineas()`, usando `localeCompare` con `numeric: true` para el código (orden natural: `MP2` antes que `MP10`). Las líneas sin materia prima asignada (agregadas a mano) quedan al final.
+  - **Precio/cantidad en 0:** al abrir el modal el precio se pre-carga en `0` cuando el catálogo tiene precio 0 (antes quedaba `null` y bloqueaba el botón "Inicializar"). La validación `lineasIniValidas()` ahora interpreta los campos vacíos como 0 y solo rechaza negativos/duplicados, permitiendo inicializar materias primas **sin existencias** (cantidad y/o precio 0). El payload normaliza `null → 0` con `?? 0`. El backend ya aceptaba 0 (`@PositiveOrZero`).
+- **Archivos principales:** `apps/web/src/app/features/granja/inventario/inventario.component.ts`.
+- **Pendiente:** smoke visual con `make dev` (probar ambos órdenes y la inicialización con líneas en 0).
+
+### 2026-06-19 — Reestructuración del frontend: paneles de KPIs/gráficos y restyle estilo handoff
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** se adaptó el frontend al prototipo `design_handoff_reforma_erp` (distribución, animaciones y gráficos), poblando lo derivable de los endpoints actuales y dejando placeholders ("Disponible próximamente") donde el backend aún no agrega.
+  - **Building blocks** (en `features/granja/shared/`): `kpi-card.component.ts` (`<reforma-kpi-card>` con delta/sparkline y entrada escalonada), `apex-charts.ts` (factories bar/donut/line/area/sparkline sobre `apex-theme.ts`), `apex-chart.component.ts` (`<reforma-apex>` envuelve `<apx-chart>`), `panel-utils.ts` (agregación mensual + top-N).
+  - **Global:** `styles.css` (var `--font-display` Space Grotesk + `.rf-num`, grids `.rf-grid-*`, keyframes `rf-rise/grow/grow-x/draw/pulse`); `index.html` (fuente Space Grotesk).
+  - **Shell:** `granja-shell.component.ts` (sidebar 254px con grupos, punto activo, tarjeta de plan) y `account-nav.component.ts` (búsqueda decorativa + notificaciones con pulso).
+  - **Paneles por módulo:** panel principal `resumen` (collage con `forkJoin`), `materias-primas`, `proveedores` (carga compras), `animales`, `compras`, `formulas` (carga detalle de la fórmula más cara), `fabricaciones`, `inventario` (KPIs migrados + 2 gráficos), y `equipo` (KPIs + donut por rol).
+  - **Build:** `docker compose build web` OK; budget inicial subido a 550kB en `angular.json`.
+- **Archivos principales:** ver lista arriba + `apps/web/src/app/features/granja/**`, `apps/web/src/app/features/equipo/equipo.component.ts`, `apps/web/src/{styles.css,index.html}`, `apps/web/angular.json`.
+- **Pendiente:** smoke visual con `make dev` (granja con datos y vacía); gráficos placeholder requieren agregación/histórico en el backend (consumo de materias, evolución de costos, toneladas por materia). Handoff detallado: `../DOCUMENTACION CURSOR/HANDOFF_graficos_restyle.md`.
+
 ### 2026-06-17 — Perfil de usuario, nombre de granja en la UI y baja del registro de logins fallidos
 - **Autor/agente:** Claude Code (Opus 4.8)
 - **Qué:** tres ajustes pedidos tras la primera ronda de pruebas.
