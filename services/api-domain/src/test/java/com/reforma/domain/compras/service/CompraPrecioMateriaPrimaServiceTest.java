@@ -110,6 +110,43 @@ class CompraPrecioMateriaPrimaServiceTest {
     }
 
     @Test
+    @DisplayName("aplicarTrasEliminarCompra: revierte al precio base manual si no quedan compras de la MP")
+    void aplicarTrasEliminarCompra_revierteAlPrecioBaseManual() {
+        maiz.setPrecioPorKilo(1000.0);
+        maiz.setPrecioBaseManual(500.0);
+        when(materiaPrimaRepository.findById(10L)).thenReturn(Optional.of(maiz));
+        when(compraDetalleRepository.findMasRecientePorMateriaPrima(
+                        eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA), any(Pageable.class)))
+                .thenReturn(List.of());
+
+        service.aplicarTrasEliminarCompra(ID_GRANJA, "c1", java.util.Set.of(10L));
+
+        verify(registroPrecioRepository).deleteByCompra_Id("c1");
+        assertThat(maiz.getPrecioPorKilo()).isEqualTo(500.0);
+        verify(formulaCostoSyncService).recalcularPorMateriasPrimas(eq(ID_GRANJA), any());
+        verify(inventarioRecalculoService).recalcularPorMaterias(eq(ID_GRANJA), any());
+    }
+
+    @Test
+    @DisplayName("aplicarTrasEliminarCompra: conserva precio si aún hay una compra más reciente")
+    void aplicarTrasEliminarCompra_conservaSiQuedaCompraReciente() {
+        maiz.setPrecioPorKilo(800.0);
+        maiz.setPrecioBaseManual(500.0);
+        CompraDetalle lineaReciente = CompraDetalle.builder()
+                .precioUnitario(800.0)
+                .materiaPrima(maiz)
+                .build();
+        when(materiaPrimaRepository.findById(10L)).thenReturn(Optional.of(maiz));
+        when(compraDetalleRepository.findMasRecientePorMateriaPrima(
+                        eq(ID_GRANJA), eq(10L), eq(EstadoCompra.REGISTRADA), any(Pageable.class)))
+                .thenReturn(List.of(lineaReciente));
+
+        service.aplicarTrasEliminarCompra(ID_GRANJA, "c1", java.util.Set.of(10L));
+
+        assertThat(maiz.getPrecioPorKilo()).isEqualTo(800.0);
+    }
+
+    @Test
     @DisplayName("calcularDiferenciaPorcentual: evita división por cero")
     void calcularDiferenciaPorcentual() {
         assertThat(CompraPrecioMateriaPrimaService.calcularDiferenciaPorcentual(0, 50)).isZero();

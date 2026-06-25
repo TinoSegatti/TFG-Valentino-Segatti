@@ -44,6 +44,13 @@ public class MateriaPrima {
     @Column(name = "precio_por_kilo", nullable = false)
     private Double precioPorKilo;
 
+    /**
+     * Precio cargado manualmente por el usuario (alta/edición). Las compras no lo modifican.
+     * Actúa como valor de reversión cuando se elimina la última compra de la MP.
+     */
+    @Column(name = "precio_base_manual", nullable = false)
+    private Double precioBaseManual;
+
     @Column(nullable = false)
     private Boolean activa;
 
