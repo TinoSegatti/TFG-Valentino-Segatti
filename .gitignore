@@ -10,6 +10,7 @@
 !**/.env.example
 
 # --- Documentos de contexto interno (no se publican) ---
+CLAUDE.md
 CONTEXTO_AGENTE_IA.md
 docs/MODULO_USUARIOS.md
 docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md
