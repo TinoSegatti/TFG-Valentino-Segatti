@@ -17,6 +17,170 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-07-02 — IA predicción (UI): zoom en el gráfico del popup
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** el gráfico de predicción de agotamiento ahora permite **zoom nativo de ApexCharts**:
+  arrastrar sobre el gráfico selecciona un rango del eje X (con reescalado automático del eje Y),
+  y la toolbar superior ofrece acercar/alejar, paneo y reset. Habilitado **solo** en el gráfico del
+  popup (`chartPrediccion` sobreescribe `chart.zoom`/`chart.toolbar` del tema base, que sigue
+  deshabilitándolos para los gráficos de dashboard). Se agregó una pista de uso bajo el gráfico y
+  estilos para que los íconos de la toolbar se vean sobre el fondo oscuro (`::ng-deep .apexcharts-toolbar`).
+- **Archivos:** `apps/web/.../features/granja/inventario/inventario.component.ts`.
+- **Verificación:** `docker compose build web` OK; contenedor recreado.
+
+### 2026-07-01 — IA: predicción de agotamiento de stock (RF-IA-PRED) — Sprint 3
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** segundo módulo de IA end-to-end. Por materia prima estima la **tendencia de existencias** y la
+  **fecha de agotamiento** cruzando el historial mensual de ingresos (compras REGISTRADAS) vs consumo
+  (fabricaciones REGISTRADAS). Método **promedio de flujo neto mensual** (RD confirmada con el usuario).
+  En la tabla de inventario cada fila muestra un **badge de riesgo** y un **botón** que abre un **popup con
+  un gráfico** (histórico real reconstruido + proyección: sube si se compra más de lo que se consume, baja
+  hasta 0 si se consume más). Gateado a **BUSINESS/ENTERPRISE** (RD-03). Plan/decisiones en
+  `docs/PLAN_ML_PREDICCION_STOCK.md`. Tabla `t_ia_prediccion_stock` ya existía (V001) → **sin migración**.
+  - **api-ml:** `app/{schemas,services,api/routers}/prediccion.py` (promedio neto, reconstrucción de serie
+    anclada al stock, proyección; decreciente capada a 12 puntos, fecha/días analíticos exactos),
+    `POST /api/ml/prediccion/stock` (batch, JWT s2s). **12 tests pytest**.
+  - **api-domain:** `MlClient.predecirStock` (fail-open) + DTOs `ml/dto`; queries mensuales
+    `ingresosMensualesPorMateria`/`consumosMensualesPorMateria` (mes "YYYY-MM" vía
+    `CAST(FUNCTION('to_char', …) AS string)`, UTC) → `prediccion/support/AgregadoMensualMateria`; dominio
+    `domain/prediccion` (entity/enum/repo/service/controller), gating `PlanService.permitePrediccionStock`.
+    `GET /api/ml/prediccion/{granja}` (batch, badges) y `.../materia-prima/{idMp}` (detalle con series).
+    Upsert (find-then-save) en `t_ia_prediccion_stock`. **Suite backend 196/196 verde.**
+  - **web:** `data/models/prediccion.model.ts`, métodos en `reforma-api.service.ts`, `inventario.component.ts`
+    (columna/badge de riesgo por fila + botón "Predicción" → modal con `<reforma-apex>`: histórico sólido +
+    proyección dashed + anotación y=0 de agotamiento + métricas). Se habilitó `annotations` en
+    `apex-charts.ts`/`apex-chart.component.ts`. **`docker compose build web` OK.**
+- **Archivos principales:** `services/api-ml/app/{schemas,services,api/routers}/prediccion.py` (+tests),
+  `services/api-domain/.../{ml/**,prediccion/**}`, `compras/repository/CompraDetalleRepository.java`,
+  `fabricaciones/repository/FabricacionDetalleRepository.java`, `suscripciones/service/PlanService.java`,
+  `apps/web/.../features/granja/inventario/inventario.component.ts`,
+  `apps/web/.../features/granja/shared/{apex-charts.ts,apex-chart.component.ts}`,
+  `apps/web/.../data/{models/prediccion.model.ts,api/reforma-api.service.ts}`.
+- **Verificado e2e:** endpoints 200 (ENTERPRISE) / **403** (STARTER); Granja ENTERPRISE MP 120 creciente
+  (SIN_RIESGO, sube 4300→9255) y MP 122 decreciente (NORMAL, agotamiento 2032, proyección capada); 32 filas
+  upserteadas en `t_ia_prediccion_stock`. **Trampa detectada:** la constructor-expression con `FUNCTION('to_char')`
+  fallaba en el arranque (SemanticException "Missing constructor") porque Hibernate no infiere el tipo → se
+  resolvió con `CAST(... AS string)`; los tests unitarios (repos mockeados) no lo detectan, sí el boot.
+- **Pendiente:** smoke visual del popup/badge en la UI; reportes que consuman predicciones + anomalías (RF-REP);
+  posible `@Scheduled` que recalcule y emita `t_alertas_ml` para CRITICO/ALERTA.
+
+### 2026-07-01 — IA anomalías (UI): la alerta de precio pasa de aviso inline a popup modal
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** en el detalle de compra, la advertencia de anomalía de precio (ATENCIÓN / ANOMALÍA ALTA)
+  ahora se muestra como **popup modal** en vez del bloque inline debajo de la línea. Al salir del campo
+  precio (on-blur), si el precio es inusual se abre el popup con el **mismo mensaje** de siempre; para
+  ANOMALÍA ALTA incluye el check "Confirmo que el precio es correcto" con botones *Revisar precio*
+  (deja sin confirmar y cierra) y *Confirmar y continuar* (habilitado solo con el check tildado). Debajo
+  de la línea queda un **chip compacto** que refleja el estado (⚠ confirmar / ✓ confirmado / ⚠ revisar)
+  y reabre el popup. La lógica de gateo del guardado (`hayAnomaliaSinConfirmar` / `puedeGuardarDetalle`)
+  no cambió. Modal con acento de color por severidad; overlay + estilos de modal locales (como en
+  inventario).
+- **Archivos principales:** `apps/web/.../features/granja/compras/compra-detalle.component.ts`
+  (signal `anomaliaPopupIndex` + computed `anomaliaPopup`, métodos `abrirAnomaliaPopup`/`cerrarAnomaliaPopup`/
+  `revisarPrecioAnomalia`, apertura del popup en `evaluarAnomaliaLinea`), `apps/web/angular.json`
+  (budget `anyComponentStyle` warning 4→6 kB; el componente ya tenía muchos estilos + ahora el modal).
+- **Verificación:** `docker compose build web` OK sin warnings; contenedor `web` recreado.
+- **Pendiente:** smoke visual en la UI (disparar ATENCIÓN y ANOMALÍA ALTA, confirmar y guardar).
+
+### 2026-07-01 — Mejoras de gráficos (Inventario y Fabricaciones) — mismo patrón
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** se replicó el patrón "código en el eje / nombre al pasar por encima" (barras) y
+  "nombre como etiqueta" (donuts) en los dos módulos restantes con gráficos:
+  1. **Inventario / Existencias por materia (donut):** la etiqueta de cada porción usa el **nombre** de la MP.
+  2. **Inventario / Valor de stock por materia (barra):** eje = **código**, tooltip = **nombre**.
+  3. **Fabricaciones / Consumo de materias primas (donut):** etiqueta con el **nombre** de la MP.
+  4. **Fabricaciones / Fórmulas más fabricadas (barra):** eje = **código** de fórmula, tooltip = **nombre**
+     (descripción). Como `FabricacionResumen` solo trae el código, se carga el catálogo de fórmulas
+     (`getFormulas`) y se mapea código→descripción.
+  - "Producción por mes" (Fabricaciones) no cambia: sus categorías son meses, no materias/fórmulas.
+- **Cómo:** reutiliza `topNombrado` + `tooltipTitles` (barras) y nombre como `label` (donuts). Solo frontend.
+- **Verificación:** `docker compose up -d --build web` OK (Angular compila, contenedor sano, HTTP 200).
+- **Archivos principales:** `apps/web/.../granja/{inventario,fabricaciones}/*.component.ts`.
+
+### 2026-07-01 — Mejoras de gráficos (Materias Primas, Proveedores, Compras, Fórmulas)
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:**
+  1. **Materias Primas / Precio por kilo (top 12):** el eje sigue mostrando el código, pero al pasar
+     por encima el tooltip muestra el **nombre** de la MP.
+  2. **Materias Primas / Consumo por materia (toneladas):** dejó de ser placeholder; ahora se alimenta
+     de la agregación de Fabricaciones (`getFabricacionesConsumoMaterias`), en toneladas (kg/1000),
+     columnas con código en la base y nombre en el tooltip.
+  3. **Proveedores / Gasto por proveedor:** corregido el `$ NaN` (en barras horizontales el formatter
+     de dinero del `yaxis` se aplicaba a las etiquetas de categoría). Ahora es columna vertical con el
+     **código** del proveedor en la base y el **nombre** en el tooltip.
+  4. **Proveedores / Compras por proveedor:** código en la base, nombre en el tooltip (misma solución).
+  5. **Compras:** eliminado el donut "Compras por proveedor" (redundante con Proveedores) y
+     reemplazado por **"Materias primas más compradas"** (donut porcentual por kilos comprados).
+     Nuevo endpoint backend `GET /api/compras/{idGranja}/materias-compradas`.
+  6. **Fórmulas / ambos gráficos:** en "Costo por fórmula" el tooltip muestra el **nombre** de la
+     fórmula (eje = código); en "Materias primas más usadas" la etiqueta de cada porción usa el
+     **nombre** de la MP.
+- **Cómo:** helper compartido `topNombrado` (paralelo a `topConOtros`, conserva `nombres`) y opción
+  `tooltipTitles` en `barChart` → `tooltip.x.formatter` por `dataPointIndex`. Los donuts muestran el
+  nombre usándolo como `label`.
+- **Verificación:** `docker compose build web` y `build api-domain` OK (Angular compila, JAR empaqueta).
+- **Archivos principales:** `apps/web/.../shared/{apex-charts.ts,panel-utils.ts}`,
+  `apps/web/.../granja/{materias-primas,proveedores,compras,formulas}/*.component.ts`,
+  `apps/web/.../data/{api/reforma-api.service.ts,models/compra.model.ts}`,
+  `services/api-domain/.../compras/{dto/MateriaPrimaCompradaResponse.java,
+  repository/CompraDetalleRepository.java, service/CompraService.java, controller/CompraRestController.java}`.
+- **Pendiente:** para ver los datos en vivo, recrear contenedores (`docker compose up -d --build api-domain web`).
+
+### 2026-07-01 — Fix IA anomalías: JWT s2s firmado con HS384 → api-ml devolvía 401 (alerta nunca disparaba)
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** la detección de anomalías de precio **nunca alertaba** (ni on-blur ni persistía en
+  `t_ia_anomalia_precio`) porque **todas** las llamadas s2s de `api-domain`→`api-ml` recibían
+  **401 Unauthorized** y el `MlClient` fail-open se las tragaba. Causa raíz: `MlJwtService` firmaba
+  con `.signWith(key)` **sin algoritmo explícito**; en jjwt 0.12.x eso autoselecciona el MAC más
+  fuerte que la clave soporta, y el secreto dev (`JWT_ML_SECRET`, 59 bytes = 472 bits) cae en 384–511
+  bits → jjwt firmaba **HS384**. Pero `api-ml` (`app/core/security.py`) solo acepta `algorithms=["HS256"]`
+  → rechazo. Diagnóstico con datos reales: granja `g_u_test_enterprise`, MP 120 (VETIMIX 20%, cód. 34),
+  4 compras del 2026-07-01 (4000/4200/4600/90000) → 0 filas en `t_ia_anomalia_precio` y logs
+  `MlClient: ... 401 Unauthorized` ×9. Verificado en vivo que HS384/HS512 dan 401 y HS256 da 200.
+- **Fix:** pinnear el algoritmo → `.signWith(key, Jwts.SIG.HS256)` en `MlJwtService`. Robusto ante
+  cualquier longitud de secreto ≥256 bits y alineado con lo que `api-ml` espera (y con el javadoc previo).
+- **Verificación:** rebuild `docker compose up -d --build api-domain`; `POST /api/ml/anomalias/{granja}/evaluar`
+  vía api-domain → HTTP 200 con clasificación real (`ANOMALIA_ALTA`, `requiereConfirmacion=true`), sin
+  más 401 en logs. (El token de usuario no estaba afectado: usa jjwt en ambos extremos, self-consistente.)
+- **Archivos principales:** `services/api-domain/.../ml/MlJwtService.java`.
+- **Pendiente:** el historial de la MP 120 quedó "contaminado" con el outlier de 90000 (las 4 compras de
+  prueba se guardaron antes del fix); para re-testear limpio conviene borrar esas compras +
+  `t_registro_precio` de la MP, o usar una materia prima nueva. Considerar agregar un test que cubra el
+  contrato de algoritmo jjwt↔jose (evita regresión si cambia el largo del secreto).
+
+### 2026-06-30 — IA: detección de anomalías de precio (sobreprecio) — Sprint 3, RF-IA-ANOM
+- **Autor/agente:** Claude Code (Opus 4.8)
+- **Qué:** primer módulo de IA end-to-end. Al cargar el precio de una materia prima en una compra, el
+  sistema lo compara contra el historial (`t_registro_precio`) y lo clasifica por Z-Score
+  (NORMAL / ATENCIÓN / ANOMALÍA ALTA / SIN HISTORIAL). El cálculo vive en **api-ml** (FastAPI, stateless);
+  Spring orquesta y persiste. Plan de referencia (gitignored): `docs/PLAN_ML_ANOMALIAS_PRECIO.md`.
+  - **api-ml (`services/api-ml`):** `app/services/anomalias.py` (Z-Score con estacionalidad RF-IA-ANOM-005:
+    >6 meses → mismo mes de años previos con umbral 2.5; historial corto → global permisivo 3.0; σ=0 → z=0),
+    `app/schemas/anomalias.py`, `app/core/security.py` (verifica JWT s2s `iss=api-domain`/`aud=api-ml`,
+    ADR-0004), endpoint `POST /api/ml/anomalias/evaluar`. **10 tests pytest** verdes.
+  - **Spring — cliente ML (`domain/ml`):** `MlJwtService` (firma s2s, jjwt), `MlClient` (`RestClient`,
+    timeout 800ms, **fail-open**: si api-ml no responde devuelve vacío y nunca bloquea la compra),
+    `MlClientConfig`, DTOs. `MlJwtServiceTest`.
+  - **Spring — dominio (`domain/anomalias`):** entidad `AnomaliaPrecio` (mapea `t_ia_anomalia_precio`,
+    ya existente en V001; FK ya en BIGINT por V005 → **sin migración**), repo, `AnomaliaPrecioService`
+    (arma historial, llama a api-ml, clasifica, persiste **solo ATENCIÓN/ANOMALÍA ALTA**), controller
+    `/api/ml/anomalias/{idGranja}` (evaluar/listar/listar por proveedor/confirmar). Hook en
+    `CompraService.guardarDetalle` → registra anomalías en **`afterCommit`** (la cabecera ya está
+    committeada → FK `id_compra` válida; persistencia aislada y fail-open). `AnomaliaPrecioServiceTest`.
+    **Suite backend 191/191 verde.**
+  - **Frontend:** `compra-detalle.component.ts` evalúa el precio **on-blur** por línea, muestra aviso
+    por nivel y, para ANOMALÍA ALTA, exige el check "Confirmo que el precio es correcto" antes de guardar
+    (envía `confirmoPrecio`). `data/models/anomalia.model.ts`, métodos en `reforma-api.service.ts`.
+    **`docker compose build web` OK.**
+- **Archivos principales:** `services/api-ml/app/{services,schemas,core/security,api/routers/anomalias}.py`
+  (+`tests/test_anomalias.py`), `services/api-domain/.../{ml/**,anomalias/**}`, `compras/service/CompraService.java`,
+  `compras/dto/CompraDetalleLineRequest.java`, `materiasprimas/repository/RegistroPrecioRepository.java`,
+  `apps/web/.../compras/compra-detalle.component.ts`, `apps/web/.../data/{models/anomalia.model.ts,api/reforma-api.service.ts}`.
+- **Pendiente:** ficha de proveedor con "Historial de anomalías" (RF-IA-ANOM-006, UI — backend listo);
+  smoke e2e con `make dev` (compra con sobreprecio → alerta → confirmar → persistida); decidir si se gatea
+  por plan (hoy: habilitado para todos, RD-03 se aplicará a la predicción de stock). **Siguiente IA:**
+  predicción de agotamiento (`t_ia_prediccion_stock`, RF-IA-PRED).
+
 ### 2026-06-23 — Inventario: Precio Almacén como costo promedio ponderado (acumuladores gasto/kilos)
 - **Autor/agente:** Cursor (Claude Opus 4.8)
 - **Qué:** se formalizó el cálculo de `t_inventario.precio_almacen` como costo promedio ponderado de
