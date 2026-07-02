@@ -13,4 +13,12 @@ public interface RegistroPrecioRepository extends JpaRepository<RegistroPrecio, 
     List<RegistroPrecio> findByCompra_Id(String idCompra);
 
     List<RegistroPrecio> findByMateriaPrimaIdOrderByFechaReferenciaDescIdDesc(Long idMateriaPrima);
+
+    /** Serie de precios de compras de una MP (para el cálculo de anomalías), orden cronológico. */
+    List<RegistroPrecio> findByMateriaPrimaIdAndOrigenOrderByFechaReferenciaAsc(
+            Long idMateriaPrima, String origen);
+
+    /** Igual que el anterior pero excluyendo una compra (la que se está registrando ahora). */
+    List<RegistroPrecio> findByMateriaPrimaIdAndOrigenAndCompraIdNotOrderByFechaReferenciaAsc(
+            Long idMateriaPrima, String origen, String idCompraExcluida);
 }

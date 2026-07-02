@@ -55,6 +55,7 @@ class CompraServiceTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private GranjaAccesoService granjaAccesoService;
     @Mock private CompraPrecioMateriaPrimaService compraPrecioMateriaPrimaService;
+    @Mock private com.reforma.domain.anomalias.service.AnomaliaPrecioService anomaliaPrecioService;
 
     @InjectMocks private CompraService compraService;
 

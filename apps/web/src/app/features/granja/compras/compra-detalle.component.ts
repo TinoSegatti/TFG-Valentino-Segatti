@@ -21,6 +21,7 @@ import {
 import { GRANJA_VISTA_STYLES } from '../shared/granja-vista.styles';
 import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
 import { OrdenTabla } from '../../../shared/orden-tabla';
+import { anomaliaEsRelevante } from '../../../data/models/anomalia.model';
 
 @Component({
   selector: 'app-compra-detalle',
@@ -282,6 +283,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                   [ngModel]="linea.precioPorKilo"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="onCampoModelChange(i, 'precio', $event)"
+                  (blur)="evaluarAnomaliaLinea(i)"
                 />
               </label>
               <label>
@@ -291,6 +293,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                   [ngModel]="linea.subtotal"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="onCampoModelChange(i, 'subtotal', $event)"
+                  (blur)="evaluarAnomaliaLinea(i)"
                 />
               </label>
               <button type="button" class="btn-quitar" (click)="quitarLinea(i)">Quitar</button>
@@ -303,6 +306,26 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
               }
               @if (linea.advertenciaLinea) {
                 <p class="warn">{{ linea.advertenciaLinea }}</p>
+              }
+
+              @if (linea.evaluandoAnomalia) {
+                <p class="anomalia-eval">Evaluando precio…</p>
+              } @else if (linea.anomalia && esAnomaliaRelevante(linea)) {
+                <button
+                  type="button"
+                  class="anomalia-chip"
+                  [class.alta]="linea.anomalia.clasificacion === 'ANOMALIA_ALTA'"
+                  [class.atencion]="linea.anomalia.clasificacion === 'ATENCION'"
+                  (click)="abrirAnomaliaPopup(i)"
+                >
+                  @if (linea.anomalia.requiereConfirmacion && linea.precioConfirmado) {
+                    ✓ Precio confirmado — ver detalle
+                  } @else if (linea.anomalia.requiereConfirmacion) {
+                    ⚠ Precio inusual — confirmar
+                  } @else {
+                    ⚠ Precio a revisar — ver detalle
+                  }
+                </button>
               }
             </div>
           }
@@ -326,6 +349,12 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
             @if (!totalesCuadran() && lineasValidas()) {
               <p class="warn">Los totales aún no coinciden (tolerancia ± $0,50).</p>
             }
+            @if (hayAnomaliaSinConfirmar()) {
+              <p class="warn">
+                Hay precios marcados como inusualmente altos. Confirmá cada uno ("Confirmo que el
+                precio es correcto") para poder guardar.
+              </p>
+            }
           </footer>
         }
 
@@ -336,6 +365,55 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
           <p class="error">{{ errorDetalle() }}</p>
         }
       </section>
+    }
+
+    <!-- Popup: alerta de anomalía de precio (RF-IA-ANOM-002) -->
+    @if (anomaliaPopup(); as pop) {
+      <div class="overlay" (click)="cerrarAnomaliaPopup()"></div>
+      <div
+        class="modal glass-card-strong anomalia-modal"
+        [class.alta]="pop.anomalia.clasificacion === 'ANOMALIA_ALTA'"
+        [class.atencion]="pop.anomalia.clasificacion === 'ATENCION'"
+        role="alertdialog"
+        aria-modal="true"
+      >
+        <h3>
+          @if (pop.anomalia.clasificacion === 'ANOMALIA_ALTA') {
+            Alerta de precio
+          } @else {
+            Atención con el precio
+          }
+        </h3>
+        <p class="anomalia-msg">{{ pop.anomalia.mensaje }}</p>
+        @if (pop.anomalia.requiereConfirmacion) {
+          <label class="confirmar">
+            <input
+              type="checkbox"
+              [ngModel]="pop.precioConfirmado"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="confirmarPrecioLinea(pop.index, $event)"
+            />
+            Confirmo que el precio es correcto
+          </label>
+          <div class="acciones-modal">
+            <button type="button" class="reforma-btn-ghost" (click)="revisarPrecioAnomalia(pop.index)">
+              Revisar precio
+            </button>
+            <button
+              type="button"
+              class="reforma-btn"
+              [disabled]="!pop.precioConfirmado"
+              (click)="cerrarAnomaliaPopup()"
+            >
+              Confirmar y continuar
+            </button>
+          </div>
+        } @else {
+          <div class="acciones-modal">
+            <button type="button" class="reforma-btn" (click)="cerrarAnomaliaPopup()">Entendido</button>
+          </div>
+        }
+      </div>
     }
   `,
   styles: [
@@ -518,6 +596,96 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         font-size: 0.85rem;
         width: 100%;
       }
+      .anomalia-eval {
+        width: 100%;
+        font-size: 0.8rem;
+        color: var(--reforma-text-faint);
+      }
+      .anomalia-chip {
+        width: 100%;
+        margin-top: 0.25rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        background: transparent;
+        border: 1px solid transparent;
+        transition: filter 0.15s ease;
+      }
+      .anomalia-chip:hover {
+        filter: brightness(1.15);
+      }
+      .anomalia-chip.atencion {
+        color: #fde68a;
+        background: rgba(251, 191, 36, 0.1);
+        border-color: rgba(251, 191, 36, 0.35);
+      }
+      .anomalia-chip.alta {
+        color: #fecaca;
+        background: rgba(248, 113, 113, 0.14);
+        border-color: rgba(248, 113, 113, 0.5);
+      }
+      /* Popup de anomalía */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(2px);
+        z-index: 40;
+      }
+      .modal {
+        position: fixed;
+        top: 18vh;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 1.5rem;
+        width: min(460px, 92vw);
+        z-index: 41;
+      }
+      .anomalia-modal {
+        border-top: 3px solid transparent;
+      }
+      .anomalia-modal.atencion {
+        border-top-color: #fbbf24;
+      }
+      .anomalia-modal.alta {
+        border-top-color: #f87171;
+      }
+      .anomalia-modal h3 {
+        margin: 0 0 0.5rem;
+        color: var(--reforma-text);
+      }
+      .anomalia-msg {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: var(--reforma-text);
+      }
+      .anomalia-modal .confirmar {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: var(--reforma-text);
+        cursor: pointer;
+      }
+      .anomalia-modal .confirmar input {
+        width: auto;
+      }
+      .acciones-modal {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: 1.25rem;
+      }
     `,
   ],
 })
@@ -550,6 +718,8 @@ export class CompraDetalleComponent implements OnInit {
   readonly idProveedorSeleccionado = signal<number | null>(null);
   readonly editandoCabecera = signal(false);
   readonly editandoDetalle = signal(false);
+  /** Índice de la línea cuya anomalía se muestra en el popup; null = popup cerrado. */
+  readonly anomaliaPopupIndex = signal<number | null>(null);
 
   readonly hoy = hoyIso();
 
@@ -612,9 +782,29 @@ export class CompraDetalleComponent implements OnInit {
 
   readonly hayMateriasDuplicadas = computed(() => this.idsMateriaDuplicados().size > 0);
 
+  /** Hay alguna línea con anomalía ALTA aún sin confirmar (RF-IA-ANOM-002): bloquea el guardado. */
+  readonly hayAnomaliaSinConfirmar = computed(() =>
+    this.lineasConMateria().some(
+      (l) => l.anomalia?.requiereConfirmacion && !l.precioConfirmado,
+    ),
+  );
+
+  /**
+   * Datos de la anomalía a mostrar en el popup (reactivo a la línea). Devuelve null si el popup
+   * está cerrado o si la línea dejó de tener una anomalía relevante (p. ej. cambió el precio).
+   */
+  readonly anomaliaPopup = computed(() => {
+    const idx = this.anomaliaPopupIndex();
+    if (idx == null) return null;
+    const linea = this.lineas()[idx];
+    if (!linea?.anomalia || !anomaliaEsRelevante(linea.anomalia.clasificacion)) return null;
+    return { index: idx, anomalia: linea.anomalia, precioConfirmado: linea.precioConfirmado };
+  });
+
   readonly puedeGuardarDetalle = computed(() => {
     if (!this.lineasValidas()) return false;
     if (this.hayMateriasDuplicadas()) return false;
+    if (this.hayAnomaliaSinConfirmar()) return false;
     return !this.lineasConMateria().some((l) =>
       l.advertenciaLinea?.includes('fuera de tolerancia'),
     );
@@ -763,6 +953,7 @@ export class CompraDetalleComponent implements OnInit {
         cantidadKg: l.cantidadKg!,
         precioPorKilo: l.precioPorKilo!,
         subtotal: l.subtotal!,
+        confirmoPrecio: l.anomalia?.requiereConfirmacion ? l.precioConfirmado : undefined,
       })),
     };
     this.guardando.set(true);
@@ -885,6 +1076,68 @@ export class CompraDetalleComponent implements OnInit {
     this.actualizarCampoLinea(index, campo, valor);
   }
 
+  /** Evalúa el precio de la línea contra el historial al salir del campo (RF-IA-ANOM-001). */
+  evaluarAnomaliaLinea(index: number): void {
+    const linea = this.lineas()[index];
+    if (!linea || linea.idMateriaPrima == null || linea.precioPorKilo == null || linea.precioPorKilo <= 0) {
+      return;
+    }
+    const idMateriaPrima = linea.idMateriaPrima;
+    const precio = linea.precioPorKilo;
+    this.patchLinea(index, { evaluandoAnomalia: true });
+    this.api
+      .evaluarAnomalia(this.idGranja, { idMateriaPrima, precio, mesReferencia: this.mesDeCompra() })
+      .subscribe({
+        next: (a) => {
+          this.patchLinea(index, {
+            anomalia: a,
+            evaluandoAnomalia: false,
+            precioConfirmado: false,
+          });
+          // Si el precio es inusual, se avisa con un popup (RF-IA-ANOM-002).
+          if (anomaliaEsRelevante(a.clasificacion)) {
+            this.anomaliaPopupIndex.set(index);
+          }
+        },
+        // Fail-open: si no se pudo evaluar, no se molesta al usuario ni se bloquea el guardado.
+        error: () => this.patchLinea(index, { evaluandoAnomalia: false, anomalia: null }),
+      });
+  }
+
+  confirmarPrecioLinea(index: number, confirmado: boolean): void {
+    this.patchLinea(index, { precioConfirmado: confirmado });
+  }
+
+  /** Reabre el popup de anomalía de una línea (desde el chip de aviso). */
+  abrirAnomaliaPopup(index: number): void {
+    this.anomaliaPopupIndex.set(index);
+  }
+
+  cerrarAnomaliaPopup(): void {
+    this.anomaliaPopupIndex.set(null);
+  }
+
+  /** El usuario quiere corregir el precio: deja la línea sin confirmar y cierra el popup. */
+  revisarPrecioAnomalia(index: number): void {
+    this.confirmarPrecioLinea(index, false);
+    this.cerrarAnomaliaPopup();
+  }
+
+  esAnomaliaRelevante(linea: LineaDetalleUi): boolean {
+    return linea.anomalia != null && anomaliaEsRelevante(linea.anomalia.clasificacion);
+  }
+
+  private patchLinea(index: number, cambios: Partial<LineaDetalleUi>): void {
+    this.lineas.update((prev) => prev.map((l, i) => (i === index ? { ...l, ...cambios } : l)));
+  }
+
+  /** Mes (1-12) de la factura para la comparación estacional; undefined si no hay fecha válida. */
+  private mesDeCompra(): number | undefined {
+    const iso = this.compra()?.fechaCompra ?? '';
+    const mes = Number(iso.slice(5, 7));
+    return Number.isFinite(mes) && mes >= 1 && mes <= 12 ? mes : undefined;
+  }
+
   lineaDuplicada(linea: LineaDetalleUi): boolean {
     return linea.idMateriaPrima != null && this.idsMateriaDuplicados().has(linea.idMateriaPrima);
   }
@@ -950,6 +1203,11 @@ export class CompraDetalleComponent implements OnInit {
 
     linea.ultimoCampoEditado = campo;
     recalcularLineaDetalle(linea);
+    if (campo === 'precio' || campo === 'subtotal') {
+      // El precio cambió: la evaluación anterior dejó de ser válida (se re-evalúa on-blur).
+      linea.anomalia = null;
+      linea.precioConfirmado = false;
+    }
     this.lineas.set(lineas);
   }
 
@@ -1001,6 +1259,9 @@ export class CompraDetalleComponent implements OnInit {
     linea.codigo = mp.codigoMateriaPrima;
     linea.nombre = mp.nombreMateriaPrima;
     linea.ultimoPrecioCatalogo = mp.precioPorKilo;
+    // La materia cambió: la evaluación anterior ya no aplica.
+    linea.anomalia = null;
+    linea.precioConfirmado = false;
     if (linea.precioPorKilo == null) {
       linea.precioPorKilo = redondearCompra(mp.precioPorKilo);
       linea.ultimoCampoEditado = 'precio';

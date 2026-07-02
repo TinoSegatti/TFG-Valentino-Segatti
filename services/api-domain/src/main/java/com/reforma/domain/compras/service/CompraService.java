@@ -1,5 +1,7 @@
 package com.reforma.domain.compras.service;
 
+import com.reforma.domain.anomalias.dto.LineaAnomaliaInput;
+import com.reforma.domain.anomalias.service.AnomaliaPrecioService;
 import com.reforma.domain.common.util.IdGenerator;
 import com.reforma.domain.compras.domain.EstadoCompra;
 import com.reforma.domain.compras.dto.CompraCabeceraRequest;
@@ -7,9 +9,11 @@ import com.reforma.domain.compras.dto.CompraCompletaResponse;
 import com.reforma.domain.compras.dto.CompraDetalleLineRequest;
 import com.reforma.domain.compras.dto.CompraResumenResponse;
 import com.reforma.domain.compras.dto.GuardarCompraDetalleRequest;
+import com.reforma.domain.compras.dto.MateriaPrimaCompradaResponse;
 import com.reforma.domain.compras.entity.CompraCabecera;
 import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.repository.CompraCabeceraRepository;
+import com.reforma.domain.compras.repository.CompraDetalleRepository;
 import com.reforma.domain.compras.support.CompraCalculo;
 import com.reforma.domain.granjas.entity.Granja;
 import com.reforma.domain.granjas.repository.GranjaRepository;
@@ -27,8 +31,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,15 +42,18 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CompraService {
 
     private final CompraCabeceraRepository compraCabeceraRepository;
+    private final CompraDetalleRepository compraDetalleRepository;
     private final ProveedorRepository proveedorRepository;
     private final MateriaPrimaRepository materiaPrimaRepository;
     private final GranjaRepository granjaRepository;
     private final UsuarioRepository usuarioRepository;
     private final GranjaAccesoService granjaAccesoService;
     private final CompraPrecioMateriaPrimaService compraPrecioMateriaPrimaService;
+    private final AnomaliaPrecioService anomaliaPrecioService;
 
     @Transactional(readOnly = true)
     public List<CompraResumenResponse> listar(String idUsuario, String idGranja) {
@@ -58,6 +67,13 @@ public class CompraService {
     public CompraCompletaResponse obtener(String idUsuario, String idGranja, String idCompra) {
         granjaAccesoService.validarAcceso(idUsuario, idGranja);
         return CompraCompletaResponse.from(obtenerCabecera(idGranja, idCompra));
+    }
+
+    /** Kilos comprados de cada MP en las compras registradas de la granja (materias más compradas). */
+    @Transactional(readOnly = true)
+    public List<MateriaPrimaCompradaResponse> comprasMaterias(String idUsuario, String idGranja) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        return compraDetalleRepository.agregarComprasMaterias(idGranja, EstadoCompra.REGISTRADA);
     }
 
     @Transactional
@@ -183,7 +199,33 @@ public class CompraService {
 
         compraPrecioMateriaPrimaService.aplicarTrasGuardarDetalle(cabecera, nuevasLineas, idsMaterias);
 
+        registrarAnomaliasDePrecio(cabecera, nuevasLineas, request);
+
         return CompraCompletaResponse.from(cabecera);
+    }
+
+    /**
+     * Dispara la detección de anomalías de precio de las líneas registradas (RF-IA-ANOM-004). El
+     * servicio difiere la persistencia a {@code afterCommit} y es fail-open: nunca afecta a la compra.
+     */
+    private void registrarAnomaliasDePrecio(
+            CompraCabecera cabecera, List<CompraDetalle> lineas, GuardarCompraDetalleRequest request) {
+        Map<Long, Boolean> confirmaciones = request.lineas().stream()
+                .filter(linea -> linea.confirmoPrecio() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        CompraDetalleLineRequest::idMateriaPrima,
+                        CompraDetalleLineRequest::confirmoPrecio,
+                        (a, b) -> b));
+        List<LineaAnomaliaInput> entradas = lineas.stream()
+                .map(linea ->
+                        new LineaAnomaliaInput(linea.getMateriaPrima().getId(), linea.getPrecioUnitario()))
+                .toList();
+        anomaliaPrecioService.registrarTrasCompra(
+                cabecera.getGranja().getId(),
+                cabecera.getId(),
+                cabecera.getFechaCompra(),
+                entradas,
+                confirmaciones);
     }
 
     private List<CompraDetalle> construirLineasValidadas(

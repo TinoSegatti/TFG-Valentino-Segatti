@@ -12,12 +12,14 @@ import {
   CompraCompleta,
   CompraResumen,
   GuardarCompraDetalleRequest,
+  MateriaPrimaComprada,
 } from '../models/compra.model';
 import {
   FormulaCabeceraRequest,
   FormulaCompleta,
   FormulaResumen,
   GuardarFormulaDetalleRequest,
+  MateriaPrimaUso,
 } from '../models/formula.model';
 import {
   ActualizarCantidadRealRequest,
@@ -30,9 +32,16 @@ import {
   FabricacionCompleta,
   FabricacionResumen,
   GuardarFabricacionDetalleRequest,
+  MateriaPrimaConsumo,
 } from '../models/fabricacion.model';
 import { CsvImportResult } from '../models/csv.model';
 import { FiltrosAuditoria, PaginaAuditoria } from '../models/auditoria.model';
+import {
+  AnomaliaEvaluacion,
+  AnomaliaHistorial,
+  EvaluarAnomaliaRequest,
+} from '../models/anomalia.model';
+import { PrediccionStock, PrediccionStockDetalle } from '../models/prediccion.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -279,6 +288,13 @@ export class ReformaApiService {
     return this.http.get<CompraResumen[]>(`${this.base}/api/compras/${idGranja}`);
   }
 
+  /** Materias primas más compradas (kilos por MP) en las compras registradas de la granja. */
+  getComprasMaterias(idGranja: string): Observable<MateriaPrimaComprada[]> {
+    return this.http.get<MateriaPrimaComprada[]>(
+      `${this.base}/api/compras/${idGranja}/materias-compradas`,
+    );
+  }
+
   getCompra(idGranja: string, idCompra: string): Observable<CompraCompleta> {
     return this.http.get<CompraCompleta>(`${this.base}/api/compras/${idGranja}/${idCompra}`);
   }
@@ -309,6 +325,55 @@ export class ReformaApiService {
     );
   }
 
+  // --- IA: anomalías de precio (RF-IA-ANOM-*) ---
+
+  evaluarAnomalia(idGranja: string, request: EvaluarAnomaliaRequest): Observable<AnomaliaEvaluacion> {
+    return this.http.post<AnomaliaEvaluacion>(
+      `${this.base}/api/ml/anomalias/${idGranja}/evaluar`,
+      request,
+    );
+  }
+
+  getAnomalias(idGranja: string, limite = 100): Observable<AnomaliaHistorial[]> {
+    const params = new HttpParams().set('limite', limite);
+    return this.http.get<AnomaliaHistorial[]>(`${this.base}/api/ml/anomalias/${idGranja}`, {
+      params,
+    });
+  }
+
+  getAnomaliasProveedor(
+    idGranja: string,
+    idProveedor: number,
+    limite = 100,
+  ): Observable<AnomaliaHistorial[]> {
+    const params = new HttpParams().set('limite', limite);
+    return this.http.get<AnomaliaHistorial[]>(
+      `${this.base}/api/ml/anomalias/${idGranja}/proveedor/${idProveedor}`,
+      { params },
+    );
+  }
+
+  confirmarAnomalia(idGranja: string, idAnomalia: string, confirmo: boolean): Observable<void> {
+    return this.http.put<void>(
+      `${this.base}/api/ml/anomalias/${idGranja}/${idAnomalia}/confirmar`,
+      { confirmo },
+    );
+  }
+
+  // --- IA: predicción de agotamiento de stock (RF-IA-PRED) ---
+
+  /** Resumen por MP para el indicador de riesgo de la tabla de inventario. */
+  getPrediccionesInventario(idGranja: string): Observable<PrediccionStock[]> {
+    return this.http.get<PrediccionStock[]>(`${this.base}/api/ml/prediccion/${idGranja}`);
+  }
+
+  /** Detalle con series (histórico + proyección) de una MP para el gráfico del popup. */
+  getPrediccionStock(idGranja: string, idMateriaPrima: number): Observable<PrediccionStockDetalle> {
+    return this.http.get<PrediccionStockDetalle>(
+      `${this.base}/api/ml/prediccion/${idGranja}/materia-prima/${idMateriaPrima}`,
+    );
+  }
+
   eliminarCompra(idGranja: string, idCompra: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/api/compras/${idGranja}/${idCompra}`);
   }
@@ -321,6 +386,13 @@ export class ReformaApiService {
   getFormula(idGranja: string, idFormula: string): Observable<FormulaCompleta> {
     return this.http.get<FormulaCompleta>(
       `${this.base}/api/formulas/${idGranja}/${idFormula}`,
+    );
+  }
+
+  /** Materias primas más usadas en el total de fórmulas activas (kilos formulados por MP). */
+  getFormulasUsoMaterias(idGranja: string): Observable<MateriaPrimaUso[]> {
+    return this.http.get<MateriaPrimaUso[]>(
+      `${this.base}/api/formulas/${idGranja}/uso-materias`,
     );
   }
 
@@ -413,6 +485,13 @@ export class ReformaApiService {
   getFabricacion(idGranja: string, idFabricacion: string): Observable<FabricacionCompleta> {
     return this.http.get<FabricacionCompleta>(
       `${this.base}/api/fabricaciones/${idGranja}/${idFabricacion}`,
+    );
+  }
+
+  /** Materias primas más consumidas en el total de fabricaciones registradas (kilos por MP). */
+  getFabricacionesConsumoMaterias(idGranja: string): Observable<MateriaPrimaConsumo[]> {
+    return this.http.get<MateriaPrimaConsumo[]>(
+      `${this.base}/api/fabricaciones/${idGranja}/consumo-materias`,
     );
   }
 
