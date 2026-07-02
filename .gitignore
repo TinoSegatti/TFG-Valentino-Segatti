@@ -15,6 +15,8 @@ CONTEXTO_AGENTE_IA.md
 docs/MODULO_USUARIOS.md
 docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md
 docs/PRECIO_ALMACEN.md
+docs/PLAN_ML_ANOMALIAS_PRECIO.md
+docs/PLAN_ML_PREDICCION_STOCK.md
 
 # --- Java / Maven (api-domain) ---
 services/api-domain/target/
