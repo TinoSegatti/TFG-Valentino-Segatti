@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routers import anomalias, health
+from app.api.routers import anomalias, health, prediccion
 
 app = FastAPI(
     title="REFORMA api-ml",
@@ -10,3 +10,4 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api/ml", tags=["health"])
 app.include_router(anomalias.router, prefix="/api/ml")
+app.include_router(prediccion.router, prefix="/api/ml")

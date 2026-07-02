@@ -103,4 +103,12 @@ public class PlanService {
             case ENTERPRISE -> Integer.MAX_VALUE;
         };
     }
+
+    /**
+     * RD-03: la predicción de agotamiento de stock (RF-IA-PRED) es un diferenciador de los planes
+     * pagos superiores. Solo BUSINESS y ENTERPRISE la tienen habilitada.
+     */
+    public boolean permitePrediccionStock(PlanSuscripcion plan) {
+        return plan == PlanSuscripcion.BUSINESS || plan == PlanSuscripcion.ENTERPRISE;
+    }
 }

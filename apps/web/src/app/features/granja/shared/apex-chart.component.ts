@@ -158,6 +158,7 @@ export class ApexChartComponent {
       'tooltip',
       'plotOptions',
       'responsive',
+      'annotations',
     ] as const;
     for (const k of keys) {
       const v = o[k];

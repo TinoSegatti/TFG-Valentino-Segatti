@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -10,10 +10,20 @@ import { MateriaPrima } from '../../../data/models/materia-prima.model';
 import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
-import { barChart, donutChart } from '../shared/apex-charts';
-import { topConOtros } from '../shared/panel-utils';
+import { barChart, donutChart, lineChart, ReformaChartOptions } from '../shared/apex-charts';
+import { topConOtros, topNombrado } from '../shared/panel-utils';
 import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
 import { OrdenTabla } from '../../../shared/orden-tabla';
+import { AuthStateService } from '../../../core/auth/auth-state.service';
+import { decodeJwtClaims } from '../../../core/auth/jwt.utils';
+import {
+  NivelAlertaStock,
+  PrediccionStock,
+  PrediccionStockDetalle,
+  nivelAlertaColor,
+  nivelAlertaLabel,
+  planPermitePrediccion,
+} from '../../../data/models/prediccion.model';
 
 interface LineaInicializacion {
   idMateriaPrima: number | null;
@@ -29,6 +39,7 @@ type OrdenInicializacion = 'nombre' | 'codigo';
   selector: 'app-inventario',
   standalone: true,
   imports: [
+    DatePipe,
     DecimalPipe,
     FormsModule,
     KpiCardComponent,
@@ -106,6 +117,9 @@ type OrdenInicializacion = 'nombre' | 'codigo';
               <th class="num sortable" [class.is-asc]="orden.esAsc('merma')" [class.is-desc]="orden.esDesc('merma')" (click)="orden.alternar('merma')">Merma</th>
               <th class="num sortable" [class.is-asc]="orden.esAsc('valor')" [class.is-desc]="orden.esDesc('valor')" (click)="orden.alternar('valor')">Valor de stock</th>
               <th class="num sortable" [class.is-asc]="orden.esAsc('almacen')" [class.is-desc]="orden.esDesc('almacen')" (click)="orden.alternar('almacen')">Precio almacén</th>
+              @if (puedeVerPrediccion()) {
+                <th>Riesgo de agotamiento</th>
+              }
               <th>Acciones</th>
             </tr>
           </thead>
@@ -127,10 +141,34 @@ type OrdenInicializacion = 'nombre' | 'codigo';
                 </td>
                 <td class="num">$ {{ i.valorStock | number: '1.2-2' }}</td>
                 <td class="num">$ {{ i.precioAlmacen | number: '1.3-3' }}</td>
-                <td>
+                @if (puedeVerPrediccion()) {
+                  <td>
+                    @if (prediccionDe(i.idMateriaPrima); as p) {
+                      <span
+                        class="riesgo-badge"
+                        [style.--riesgo]="colorNivel(p.nivelAlerta)"
+                        [title]="tituloRiesgo(p)"
+                      >
+                        {{ textoRiesgo(p) }}
+                      </span>
+                    } @else {
+                      <span class="text-dim mini">—</span>
+                    }
+                  </td>
+                }
+                <td class="acciones-celda">
                   <button type="button" class="reforma-btn-ghost reforma-btn-sm" (click)="abrirEdicion(i)">
                     <i class="pi pi-pencil"></i> Editar real
                   </button>
+                  @if (puedeVerPrediccion()) {
+                    <button
+                      type="button"
+                      class="reforma-btn-ghost reforma-btn-sm"
+                      (click)="abrirPrediccion(i)"
+                    >
+                      <i class="pi pi-chart-line"></i> Predicción
+                    </button>
+                  }
                 </td>
               </tr>
             }
@@ -178,6 +216,68 @@ type OrdenInicializacion = 'nombre' | 'codigo';
       </div>
     }
 
+    <!-- Modal: predicción de agotamiento (gráfico) -->
+    @if (prediccionAbierta()) {
+      <div class="overlay" (click)="cerrarPrediccion()"></div>
+      <div class="modal modal-ancho glass-card-strong" role="dialog" aria-modal="true">
+        @if (cargandoPrediccion()) {
+          <h3>Predicción de agotamiento</h3>
+          <p class="mini text-dim">Calculando proyección…</p>
+        } @else if (prediccionModal()) {
+          @if (prediccionModal(); as d) {
+          <h3>
+            Predicción de agotamiento — {{ d.resumen.nombreMateriaPrima }}
+            <span
+              class="riesgo-badge"
+              [style.--riesgo]="colorNivel(d.resumen.nivelAlerta)"
+            >{{ etiquetaNivel(d.resumen.nivelAlerta) }}</span>
+          </h3>
+          <p class="mini text-dim">
+            @if (d.resumen.nivelAlerta === 'SIN_DATOS') {
+              Historial insuficiente para proyectar (se necesitan al menos 2 meses con compras o
+              fabricaciones de esta materia prima).
+            } @else if (d.resumen.diasRestantes != null) {
+              Al ritmo actual, el stock se agota en
+              <strong>{{ d.resumen.diasRestantes }} días</strong>
+              @if (d.resumen.fechaAgotamiento) {
+                (aprox. {{ d.resumen.fechaAgotamiento | date: 'dd/MM/yyyy' }})
+              }.
+            } @else {
+              La tendencia es <strong>{{ tendenciaLabel(d.resumen.tendencia) }}</strong>: al ritmo
+              actual no se proyecta agotamiento.
+            }
+          </p>
+
+          @if (chartPrediccion(); as chart) {
+            <reforma-apex [options]="chart" />
+            <p class="mini text-dim zoom-hint">
+              <i class="pi pi-search-plus"></i> Arrastrá sobre el gráfico para hacer zoom en un
+              rango; usá la barra superior para acercar/alejar, panear o restablecer.
+            </p>
+          }
+
+          <div class="pred-metricas">
+            <div><span class="text-dim mini">Stock actual</span><strong>{{ d.resumen.stockActual | number: '1.0-2' }} kg</strong></div>
+            <div><span class="text-dim mini">Ingreso mensual prom.</span><strong>{{ d.resumen.ingresoPromedio | number: '1.0-2' }} kg</strong></div>
+            <div><span class="text-dim mini">Consumo mensual prom.</span><strong>{{ d.resumen.consumoPromedio | number: '1.0-2' }} kg</strong></div>
+            <div>
+              <span class="text-dim mini">Flujo neto mensual</span>
+              <strong [class.neto-pos]="d.resumen.netoPromedio >= 0" [class.neto-neg]="d.resumen.netoPromedio < 0">
+                {{ d.resumen.netoPromedio >= 0 ? '+' : '' }}{{ d.resumen.netoPromedio | number: '1.0-2' }} kg
+              </strong>
+            </div>
+          </div>
+          }
+        } @else {
+          <h3>Predicción de agotamiento</h3>
+          <p class="mini text-dim">{{ errorPrediccion() ?? 'No se pudo calcular la predicción.' }}</p>
+        }
+        <div class="acciones-modal">
+          <button type="button" class="reforma-btn" (click)="cerrarPrediccion()">Cerrar</button>
+        </div>
+      </div>
+    }
+
     <!-- Modal: inicializar inventario -->
     @if (modoInicializar()) {
       <div class="overlay" (click)="cerrarInicializacion()"></div>
@@ -217,7 +317,7 @@ type OrdenInicializacion = 'nombre' | 'codigo';
                 <th>Materia prima</th>
                 <th class="num">Cantidad inicial (kg)</th>
                 <th class="num">Precio inicial ($/kg)</th>
-                <th></th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -363,6 +463,52 @@ type OrdenInicializacion = 'nombre' | 'codigo';
       .merma-neg {
         color: var(--reforma-cyan);
       }
+      /* Indicador de riesgo de agotamiento (RF-IA-PRED) */
+      .riesgo-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--riesgo, #6b7280);
+        background: color-mix(in srgb, var(--riesgo, #6b7280) 14%, transparent);
+        border: 1px solid color-mix(in srgb, var(--riesgo, #6b7280) 45%, transparent);
+      }
+      .acciones-celda {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .pred-metricas {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      .pred-metricas > div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+      }
+      .neto-pos {
+        color: var(--reforma-cyan);
+      }
+      .neto-neg {
+        color: var(--reforma-warn);
+      }
+      .zoom-hint {
+        margin-top: 0.35rem;
+      }
+      /* Toolbar de zoom de ApexCharts sobre fondo oscuro */
+      :host ::ng-deep .apexcharts-toolbar svg {
+        fill: #9aa7b8;
+      }
+      :host ::ng-deep .apexcharts-toolbar .apexcharts-selected svg {
+        fill: var(--reforma-cyan, #06b6d4);
+      }
       /* Modales */
       .overlay {
         position: fixed;
@@ -461,6 +607,75 @@ export class InventarioComponent implements OnInit {
   readonly guardandoIni = signal(false);
   readonly ordenIni = signal<OrdenInicializacion>('nombre');
 
+  // --- IA: predicción de agotamiento (RF-IA-PRED) ---
+  private readonly auth = inject(AuthStateService);
+  /** Predicción por MP (idMateriaPrima -> resumen), para el indicador de riesgo de la tabla. */
+  readonly predicciones = signal<Map<number, PrediccionStock>>(new Map());
+  readonly prediccionModal = signal<PrediccionStockDetalle | null>(null);
+  readonly prediccionAbierta = signal(false);
+  readonly cargandoPrediccion = signal(false);
+  readonly errorPrediccion = signal<string | null>(null);
+
+  /** RD-03: la predicción es exclusiva de BUSINESS/ENTERPRISE (se lee el plan del JWT). */
+  readonly puedeVerPrediccion = computed(() =>
+    planPermitePrediccion(decodeJwtClaims(this.auth.getToken())?.planSuscripcion),
+  );
+
+  readonly chartPrediccion = computed<ReformaChartOptions | null>(() => {
+    const d = this.prediccionModal();
+    if (!d || d.serieHistorica.length === 0) return null;
+    const hist = d.serieHistorica;
+    const proy = d.serieProyeccion ?? [];
+    const categorias = [...hist, ...proy].map((p) => this.mesLabel(p.mes));
+    const nHist = hist.length;
+    const historico = [...hist.map((p) => p.existencias), ...proy.map(() => null as number | null)];
+    // La proyección arranca en el último punto real para que las líneas se conecten.
+    const proyeccion = [
+      ...hist.map((p, idx) => (idx === nHist - 1 ? p.existencias : (null as number | null))),
+      ...proy.map((p) => p.existencias),
+    ];
+    const base = lineChart({
+      categories: categorias,
+      series: [
+        { name: 'Existencias', data: historico },
+        { name: 'Proyección', data: proyeccion },
+      ],
+      height: 300,
+    });
+    const hayAgotamiento = d.resumen.diasRestantes != null;
+    return {
+      ...base,
+      // Zoom para inspeccionar la proyección: arrastrar selecciona un rango; la barra
+      // ofrece +/-, paneo y reset. Solo en este gráfico (los del dashboard son estáticos).
+      chart: {
+        ...base.chart,
+        zoom: { enabled: true, type: 'x', autoScaleYaxis: true },
+        toolbar: {
+          show: true,
+          tools: { download: false, selection: false, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true },
+          autoSelected: 'zoom',
+        },
+      },
+      colors: ['#06b6d4', '#fb923c'],
+      stroke: { curve: 'straight', width: [3, 2], dashArray: [0, 6] },
+      annotations: hayAgotamiento
+        ? {
+            yaxis: [
+              {
+                y: 0,
+                borderColor: '#f87171',
+                strokeDashArray: 4,
+                label: {
+                  text: 'Agotamiento',
+                  style: { color: '#fff', background: '#f87171' },
+                },
+              },
+            ],
+          }
+        : {},
+    };
+  });
+
   readonly resumen = computed(() => {
     const items = this.inventario();
     if (items.length === 0) return null;
@@ -481,19 +696,25 @@ export class InventarioComponent implements OnInit {
   });
 
   // Distribución de existencias (kg) y valor de stock, derivadas del inventario.
+  // El donut usa el nombre de la MP como etiqueta (se lee al pasar por encima); la
+  // barra muestra el código en el eje y el nombre en el tooltip.
   readonly existencias = computed(() =>
     topConOtros(
       this.inventario()
         .filter((i) => i.cantidadReal > 0)
-        .map((i) => ({ label: i.codigoMateriaPrima, valor: i.cantidadReal })),
+        .map((i) => ({ label: i.nombreMateriaPrima || i.codigoMateriaPrima, valor: i.cantidadReal })),
       8,
     ),
   );
   readonly valorStock = computed(() =>
-    topConOtros(
+    topNombrado(
       this.inventario()
         .filter((i) => i.valorStock > 0)
-        .map((i) => ({ label: i.codigoMateriaPrima, valor: i.valorStock })),
+        .map((i) => ({
+          label: i.codigoMateriaPrima,
+          nombre: i.nombreMateriaPrima,
+          valor: i.valorStock,
+        })),
       9,
     ),
   );
@@ -513,6 +734,7 @@ export class InventarioComponent implements OnInit {
       distributed: true,
       money: true,
       height: 280,
+      tooltipTitles: this.valorStock().nombres,
     }),
   );
 
@@ -535,6 +757,7 @@ export class InventarioComponent implements OnInit {
   ngOnInit(): void {
     this.recargar();
     this.cargarMaterias();
+    this.cargarPredicciones();
   }
 
   recargar(): void {
@@ -560,6 +783,7 @@ export class InventarioComponent implements OnInit {
         this.inventario.set(resp.items);
         this.inicializado.set(resp.inicializado);
         this.cargando.set(false);
+        this.cargarPredicciones();
       },
       error: (err: HttpErrorResponse) => {
         this.error.set(mensajeErrorHttp(err, 'No se pudo recalcular el inventario'));
@@ -583,6 +807,88 @@ export class InventarioComponent implements OnInit {
   /** merma = cantidad en sistema - cantidad real (kg). */
   mermaKg(item: InventarioItem): number {
     return item.cantidadSistema - item.cantidadReal;
+  }
+
+  // --- IA: predicción de agotamiento ---
+
+  /** Carga (o refresca) el resumen de predicción de todas las MPs para los badges de la tabla. */
+  cargarPredicciones(): void {
+    if (!this.puedeVerPrediccion()) return;
+    this.api.getPrediccionesInventario(this.idGranja).subscribe({
+      next: (lista) => this.predicciones.set(new Map(lista.map((p) => [p.idMateriaPrima, p]))),
+      // Fail-open: si falla, la tabla simplemente no muestra el indicador de riesgo.
+      error: () => this.predicciones.set(new Map()),
+    });
+  }
+
+  prediccionDe(idMateriaPrima: number): PrediccionStock | undefined {
+    const p = this.predicciones().get(idMateriaPrima);
+    return p && p.nivelAlerta !== 'SIN_DATOS' ? p : undefined;
+  }
+
+  colorNivel(nivel: NivelAlertaStock): string {
+    return nivelAlertaColor(nivel);
+  }
+
+  etiquetaNivel(nivel: NivelAlertaStock): string {
+    return nivelAlertaLabel(nivel);
+  }
+
+  /** Texto compacto del badge de la tabla: días restantes, o la tendencia si no hay agotamiento. */
+  textoRiesgo(p: PrediccionStock): string {
+    if (p.diasRestantes != null) return `${p.diasRestantes} días`;
+    if (p.tendencia === 'CRECIENTE') return '↑ creciente';
+    return 'estable';
+  }
+
+  tituloRiesgo(p: PrediccionStock): string {
+    if (p.diasRestantes != null) {
+      const fecha = p.fechaAgotamiento ? ` (aprox. ${p.fechaAgotamiento})` : '';
+      return `${nivelAlertaLabel(p.nivelAlerta)}: se agota en ${p.diasRestantes} días${fecha}`;
+    }
+    return `${nivelAlertaLabel(p.nivelAlerta)}: sin riesgo de agotamiento al ritmo actual`;
+  }
+
+  tendenciaLabel(t: string): string {
+    if (t === 'CRECIENTE') return 'creciente';
+    if (t === 'DECRECIENTE') return 'decreciente';
+    return 'estable';
+  }
+
+  /** "2026-07" -> "jul 2026" (para el eje del gráfico). */
+  mesLabel(mes: string): string {
+    const [anio, m] = mes.split('-');
+    const nombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const idx = Number(m) - 1;
+    return `${nombres[idx] ?? m} ${anio}`;
+  }
+
+  abrirPrediccion(item: InventarioItem): void {
+    this.prediccionAbierta.set(true);
+    this.prediccionModal.set(null);
+    this.errorPrediccion.set(null);
+    this.cargandoPrediccion.set(true);
+    this.api.getPrediccionStock(this.idGranja, item.idMateriaPrima).subscribe({
+      next: (detalle) => {
+        this.prediccionModal.set(detalle);
+        this.cargandoPrediccion.set(false);
+        // Aprovecha para refrescar el badge de esa fila.
+        this.predicciones.update((prev) => {
+          const next = new Map(prev);
+          next.set(detalle.resumen.idMateriaPrima, detalle.resumen);
+          return next;
+        });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.errorPrediccion.set(mensajeErrorHttp(err, 'No se pudo calcular la predicción'));
+        this.cargandoPrediccion.set(false);
+      },
+    });
+  }
+
+  cerrarPrediccion(): void {
+    this.prediccionAbierta.set(false);
+    this.prediccionModal.set(null);
   }
 
   abrirEdicion(item: InventarioItem): void {
@@ -615,6 +921,7 @@ export class InventarioComponent implements OnInit {
           );
           this.guardandoEdicion.set(false);
           this.cerrarEdicion();
+          this.cargarPredicciones();
         },
         error: (err: HttpErrorResponse) => {
           this.error.set(mensajeErrorHttp(err, 'No se pudo actualizar la cantidad real'));
