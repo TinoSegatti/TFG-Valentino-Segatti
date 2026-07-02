@@ -5,7 +5,11 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
-import { CompraResumen, textoConfirmacionEliminarFactura } from '../../../data/models/compra.model';
+import {
+  CompraResumen,
+  MateriaPrimaComprada,
+  textoConfirmacionEliminarFactura,
+} from '../../../data/models/compra.model';
 import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
@@ -48,13 +52,13 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         <reforma-apex [options]="chartGasto()" />
       </reforma-chart-card>
       <reforma-chart-card
-        title="Compras por proveedor"
+        title="Materias primas más compradas"
         icon="pi-chart-pie"
-        [loading]="cargando()"
-        [empty]="!cargando() && porProveedor().valores.length === 0"
-        emptyText="Sin datos para mostrar"
+        [loading]="cargandoMaterias()"
+        [empty]="!cargandoMaterias() && materiasCompradas().valores.length === 0"
+        emptyText="Registrá compras para ver las materias primas más compradas"
       >
-        <reforma-apex [options]="chartProveedor()" />
+        <reforma-apex [options]="chartMaterias()" />
       </reforma-chart-card>
     </section>
 
@@ -101,7 +105,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                   <th class="sortable" [class.is-asc]="orden.esAsc('proveedor')" [class.is-desc]="orden.esDesc('proveedor')" (click)="orden.alternar('proveedor')">Proveedor</th>
                   <th class="num sortable" [class.is-asc]="orden.esAsc('total')" [class.is-desc]="orden.esDesc('total')" (click)="orden.alternar('total')">Total</th>
                   <th class="sortable" [class.is-asc]="orden.esAsc('estado')" [class.is-desc]="orden.esDesc('estado')" (click)="orden.alternar('estado')">Estado</th>
-                  <th></th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,17 +238,19 @@ export class ComprasComponent implements OnInit {
   readonly gastoMensual = computed(() =>
     sumarPorMes(this.compras(), (c) => c.fechaCompra, (c) => c.totalFactura),
   );
-  readonly porProveedor = computed(() => {
-    const acum = new Map<string, number>();
-    for (const c of this.compras()) {
-      const label = c.nombreProveedor || c.codigoProveedor || '—';
-      acum.set(label, (acum.get(label) ?? 0) + c.totalFactura);
-    }
-    return topConOtros(
-      [...acum.entries()].map(([label, v]) => ({ label, valor: v })),
-      6,
-    );
-  });
+
+  // Materias primas más compradas (kilos), donut porcentual. La etiqueta usa el
+  // nombre de la MP para que se lea directamente al pasar por encima de cada porción.
+  readonly comprasMaterias = signal<MateriaPrimaComprada[]>([]);
+  readonly cargandoMaterias = signal(true);
+  readonly materiasCompradas = computed(() =>
+    topConOtros(
+      this.comprasMaterias()
+        .filter((m) => m.totalKg > 0)
+        .map((m) => ({ label: m.nombreMateriaPrima || m.codigoMateriaPrima, valor: m.totalKg })),
+      8,
+    ),
+  );
 
   readonly chartGasto = computed(() =>
     areaChart({
@@ -254,13 +260,12 @@ export class ComprasComponent implements OnInit {
       height: 300,
     }),
   );
-  readonly chartProveedor = computed(() =>
+  readonly chartMaterias = computed(() =>
     donutChart({
-      labels: this.porProveedor().labels,
-      series: this.porProveedor().valores,
-      totalLabel: 'Gasto total',
-      totalFormatter: (t) => '$ ' + Math.round(t).toLocaleString('en-US'),
-      money: true,
+      labels: this.materiasCompradas().labels,
+      series: this.materiasCompradas().valores,
+      totalLabel: 'Total comprado',
+      totalFormatter: (t) => Math.round(t).toLocaleString('es-AR') + ' kg',
       height: 300,
     }),
   );
@@ -319,6 +324,19 @@ export class ComprasComponent implements OnInit {
         this.error.set('No se pudieron cargar las compras');
         this.cargando.set(false);
       },
+    });
+    this.cargarMateriasCompradas();
+  }
+
+  /** Materias primas más compradas (para el donut porcentual). */
+  private cargarMateriasCompradas(): void {
+    this.cargandoMaterias.set(true);
+    this.api.getComprasMaterias(this.idGranja).subscribe({
+      next: (list) => {
+        this.comprasMaterias.set(list);
+        this.cargandoMaterias.set(false);
+      },
+      error: () => this.cargandoMaterias.set(false),
     });
   }
 }

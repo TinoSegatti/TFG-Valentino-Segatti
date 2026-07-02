@@ -6,6 +6,7 @@ import com.reforma.domain.formulas.dto.FormulaCabeceraRequest;
 import com.reforma.domain.formulas.dto.FormulaCompletaResponse;
 import com.reforma.domain.formulas.dto.FormulaResumenResponse;
 import com.reforma.domain.formulas.dto.GuardarFormulaDetalleRequest;
+import com.reforma.domain.formulas.dto.MateriaPrimaUsoResponse;
 import com.reforma.domain.formulas.service.FormulaService;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -39,6 +40,15 @@ public class FormulaRestController {
     @GetMapping
     public List<FormulaResumenResponse> listar(@PathVariable String idGranja) {
         return formulaService.listar(SecurityUtils.requireTenantId(), idGranja);
+    }
+
+    /**
+     * Uso agregado de materias primas en todas las fórmulas activas (kilos formulados por MP).
+     * Debe ir antes de {@code /{idFormula}} para no colisionar con esa ruta variable.
+     */
+    @GetMapping("/uso-materias")
+    public List<MateriaPrimaUsoResponse> usoMaterias(@PathVariable String idGranja) {
+        return formulaService.usoMaterias(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idFormula}")

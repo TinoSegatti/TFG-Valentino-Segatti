@@ -5,6 +5,7 @@ import com.reforma.domain.compras.dto.CompraCabeceraRequest;
 import com.reforma.domain.compras.dto.CompraCompletaResponse;
 import com.reforma.domain.compras.dto.CompraResumenResponse;
 import com.reforma.domain.compras.dto.GuardarCompraDetalleRequest;
+import com.reforma.domain.compras.dto.MateriaPrimaCompradaResponse;
 import com.reforma.domain.compras.service.CompraService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +32,15 @@ public class CompraRestController {
     @GetMapping
     public List<CompraResumenResponse> listar(@PathVariable String idGranja) {
         return compraService.listar(SecurityUtils.requireTenantId(), idGranja);
+    }
+
+    /**
+     * Materias primas más compradas (kilos por MP) en las compras registradas.
+     * Ruta literal: Spring la prioriza sobre la variable {@code /{idCompra}}.
+     */
+    @GetMapping("/materias-compradas")
+    public List<MateriaPrimaCompradaResponse> materiasCompradas(@PathVariable String idGranja) {
+        return compraService.comprasMaterias(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idCompra}")

@@ -14,6 +14,7 @@
  * que `<apx-chart>` acepta como inputs.
  */
 import {
+  ApexAnnotations,
   ApexAxisChartSeries,
   ApexNonAxisChartSeries,
   ApexChart,
@@ -55,6 +56,7 @@ export interface ReformaChartOptions {
   tooltip?: ApexTooltip;
   plotOptions?: ApexPlotOptions;
   responsive?: ApexResponsive[];
+  annotations?: ApexAnnotations;
 }
 
 const AXIS_LABEL_STYLE = { colors: '#9aa7b8', fontSize: '11px' };
@@ -68,11 +70,23 @@ function moneyFormatter(v: number): string {
  * hace que ApexCharts después lea `tooltip.y.formatter` y lance
  * "Cannot read properties of undefined (reading 'formatter')". La clave `y` solo
  * debe existir cuando hay formatter.
+ *
+ * `tooltipTitles` (opcional, paralelo a las categorías del eje X) reemplaza el
+ * título del tooltip por un texto más descriptivo: así el eje puede mostrar el
+ * código corto de cada columna y al pasar por encima se ve el nombre completo.
  */
-function buildTooltip(money?: boolean): ApexTooltip {
+function buildTooltip(money?: boolean, tooltipTitles?: string[]): ApexTooltip {
   const t: ApexTooltip = { ...reformaApexTooltip };
   if (money) {
     t.y = { formatter: moneyFormatter };
+  }
+  if (tooltipTitles) {
+    t.x = {
+      formatter: (val: number, opts?: { dataPointIndex?: number }): string => {
+        const i = opts?.dataPointIndex;
+        return (i != null ? tooltipTitles[i] : undefined) ?? String(val);
+      },
+    };
   }
   return t;
 }
@@ -86,6 +100,8 @@ export function barChart(opts: {
   distributed?: boolean;
   money?: boolean;
   colors?: string[];
+  /** Títulos alternativos para el tooltip, paralelos a `categories` (eje = código, hover = nombre). */
+  tooltipTitles?: string[];
 }): ReformaChartOptions {
   return {
     series: opts.series,
@@ -115,7 +131,7 @@ export function barChart(opts: {
     },
     grid: reformaApexGrid,
     legend: { ...reformaApexLegend, show: !opts.distributed && opts.series.length > 1 },
-    tooltip: buildTooltip(opts.money),
+    tooltip: buildTooltip(opts.money, opts.tooltipTitles),
     xaxis: {
       categories: opts.categories,
       labels: { style: AXIS_LABEL_STYLE, rotate: -35, trim: true, hideOverlappingLabels: false },

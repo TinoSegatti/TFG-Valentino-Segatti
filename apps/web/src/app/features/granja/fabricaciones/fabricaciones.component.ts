@@ -7,13 +7,15 @@ import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import {
   FabricacionResumen,
+  MateriaPrimaConsumo,
   textoConfirmacionEliminarFabricacion,
 } from '../../../data/models/fabricacion.model';
+import { FormulaResumen } from '../../../data/models/formula.model';
 import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
-import { barChart } from '../shared/apex-charts';
-import { sumarPorMes } from '../shared/panel-utils';
+import { barChart, donutChart } from '../shared/apex-charts';
+import { sumarPorMes, topConOtros, topNombrado } from '../shared/panel-utils';
 import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
@@ -52,20 +54,26 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         <reforma-apex [options]="chartProduccion()" />
       </reforma-chart-card>
       <reforma-chart-card
-        title="Consumo de materias primas"
-        icon="pi-chart-bar"
-        [empty]="true"
-        emptyText="Disponible próximamente — requiere agregación de consumo en el backend"
-      />
+        title="Consumo de materias primas (kg)"
+        icon="pi-chart-pie"
+        [loading]="cargandoConsumo()"
+        [empty]="!cargandoConsumo() && consumo().valores.length === 0"
+        emptyText="Registrá fabricaciones para ver el consumo de materias primas"
+      >
+        <reforma-apex [options]="chartConsumo()" />
+      </reforma-chart-card>
     </section>
 
     <section class="rf-panel">
       <reforma-chart-card
-        title="Evolución del costo por kilo"
-        icon="pi-chart-line"
-        [empty]="true"
-        emptyText="Disponible próximamente — requiere histórico de costos en el backend"
-      />
+        title="Fórmulas más fabricadas (kg producidos)"
+        icon="pi-chart-bar"
+        [loading]="cargando()"
+        [empty]="!cargando() && formulasMasFabricadas().valores.length === 0"
+        emptyText="Registrá fabricaciones para ver las fórmulas más producidas"
+      >
+        <reforma-apex [options]="chartFormulasMasFabricadas()" />
+      </reforma-chart-card>
     </section>
 
     @if (fabricacionEliminando()) {
@@ -113,7 +121,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                   <th class="num sortable" [class.is-asc]="orden.esAsc('veces')" [class.is-desc]="orden.esDesc('veces')" (click)="orden.alternar('veces')">Veces</th>
                   <th class="num sortable" [class.is-asc]="orden.esAsc('costo')" [class.is-desc]="orden.esDesc('costo')" (click)="orden.alternar('costo')">Costo</th>
                   <th class="sortable" [class.is-asc]="orden.esAsc('estado')" [class.is-desc]="orden.esDesc('estado')" (click)="orden.alternar('estado')">Estado</th>
-                  <th></th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -134,12 +142,14 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                       }
                     </td>
                     <td class="acciones">
-                      <a [routerLink]="[f.id]" class="reforma-btn-ghost reforma-btn-sm">
-                        <i class="pi pi-eye"></i> Ver
-                      </a>
-                      <button type="button" class="reforma-btn-danger" (click)="iniciarEliminar(f)">
-                        <i class="pi pi-trash"></i> Eliminar
-                      </button>
+                      <div class="acciones-inner">
+                        <a [routerLink]="[f.id]" class="reforma-btn-ghost reforma-btn-sm">
+                          <i class="pi pi-eye"></i> Ver
+                        </a>
+                        <button type="button" class="reforma-btn-danger" (click)="iniciarEliminar(f)">
+                          <i class="pi pi-trash"></i> Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 }
@@ -189,6 +199,8 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         text-align: right;
         width: 1%;
         white-space: nowrap;
+      }
+      .lista .acciones-inner {
         display: flex;
         gap: 0.5rem;
         justify-content: flex-end;
@@ -242,6 +254,10 @@ export class FabricacionesComponent implements OnInit {
   fabricacionEliminando = signal<FabricacionResumen | null>(null);
   textoConfirmacionEliminar = '';
 
+  // Consumo agregado de materias primas en todas las fabricaciones (donut).
+  readonly consumoMaterias = signal<MateriaPrimaConsumo[]>([]);
+  readonly cargandoConsumo = signal(true);
+
   readonly stats = computed(() => {
     const fs = this.fabricaciones();
     const kilos = fs.reduce((s, f) => s + f.veces * 1000, 0);
@@ -262,6 +278,66 @@ export class FabricacionesComponent implements OnInit {
       categories: this.produccionMensual().labels,
       series: [{ name: 'Kilos', data: this.produccionMensual().valores }],
       height: 300,
+    }),
+  );
+
+  // Donut de consumo de MP (kilos usados en fabricaciones), top 8 + "Otros".
+  // La etiqueta usa el nombre de la MP para que se lea al pasar por encima de cada porción.
+  readonly consumo = computed(() =>
+    topConOtros(
+      this.consumoMaterias().map((c) => ({
+        label: c.nombreMateriaPrima || c.codigoMateriaPrima,
+        valor: c.totalKg,
+      })),
+      8,
+    ),
+  );
+  readonly chartConsumo = computed(() =>
+    donutChart({
+      labels: this.consumo().labels,
+      series: this.consumo().valores,
+      totalLabel: 'Total consumido',
+      totalFormatter: (t) => Math.round(t).toLocaleString('es-AR') + ' kg',
+      height: 300,
+    }),
+  );
+
+  // Catálogo de fórmulas (para mapear código → nombre en el tooltip de la barra;
+  // el resumen de fabricación solo trae el código de fórmula).
+  readonly formulasCatalogo = signal<FormulaResumen[]>([]);
+  private readonly nombreFormulaPorCodigo = computed(() => {
+    const map = new Map<string, string>();
+    for (const f of this.formulasCatalogo()) {
+      map.set(f.codigoFormula, f.descripcionFormula);
+    }
+    return map;
+  });
+
+  // Fórmulas más fabricadas históricamente, por kilos producidos (veces × 1000).
+  // Eje = código de fórmula, tooltip = nombre (descripción).
+  readonly formulasMasFabricadas = computed(() => {
+    const nombreDe = this.nombreFormulaPorCodigo();
+    const acum = new Map<string, number>();
+    for (const f of this.fabricaciones()) {
+      const clave = f.codigoFormula ?? '—';
+      acum.set(clave, (acum.get(clave) ?? 0) + f.veces * 1000);
+    }
+    return topNombrado(
+      [...acum.entries()].map(([label, valor]) => ({
+        label,
+        nombre: nombreDe.get(label) ?? label,
+        valor,
+      })),
+      10,
+    );
+  });
+  readonly chartFormulasMasFabricadas = computed(() =>
+    barChart({
+      categories: this.formulasMasFabricadas().labels,
+      series: [{ name: 'Kilos producidos', data: this.formulasMasFabricadas().valores }],
+      distributed: true,
+      height: 300,
+      tooltipTitles: this.formulasMasFabricadas().nombres,
     }),
   );
 
@@ -290,6 +366,28 @@ export class FabricacionesComponent implements OnInit {
         this.error.set(mensajeErrorHttp(err, 'No se pudo cargar las fabricaciones'));
         this.cargando.set(false);
       },
+    });
+    this.cargarConsumo();
+    this.cargarFormulas();
+  }
+
+  /** Catálogo de fórmulas para mapear código → nombre en el tooltip de la barra. */
+  private cargarFormulas(): void {
+    this.api.getFormulas(this.idGranja()).subscribe({
+      next: (lista) => this.formulasCatalogo.set(lista),
+      error: () => this.formulasCatalogo.set([]),
+    });
+  }
+
+  /** Carga el consumo agregado de materias primas en todas las fabricaciones (donut). */
+  private cargarConsumo(): void {
+    this.cargandoConsumo.set(true);
+    this.api.getFabricacionesConsumoMaterias(this.idGranja()).subscribe({
+      next: (consumo) => {
+        this.consumoMaterias.set(consumo);
+        this.cargandoConsumo.set(false);
+      },
+      error: () => this.cargandoConsumo.set(false),
     });
   }
 

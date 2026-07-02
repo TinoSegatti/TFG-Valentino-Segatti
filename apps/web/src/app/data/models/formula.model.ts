@@ -19,6 +19,13 @@ export interface FormulaCabeceraRequest {
   idAnimal: number;
 }
 
+/** Uso agregado de una MP en el total de fórmulas activas (kilos formulados). */
+export interface MateriaPrimaUso {
+  codigoMateriaPrima: string;
+  nombreMateriaPrima: string;
+  totalKg: number;
+}
+
 export interface FormulaDetalleLine {
   id?: string;
   idMateriaPrima: number;

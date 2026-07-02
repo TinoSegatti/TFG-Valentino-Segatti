@@ -11,7 +11,8 @@ import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
 import { barChart } from '../shared/apex-charts';
-import { topConOtros } from '../shared/panel-utils';
+import { topNombrado } from '../shared/panel-utils';
+import { MateriaPrimaConsumo } from '../../../data/models/fabricacion.model';
 import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
 import { OrdenTabla } from '../../../shared/orden-tabla';
 
@@ -50,9 +51,12 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
       <reforma-chart-card
         title="Consumo por materia (toneladas)"
         icon="pi-chart-bar"
-        [empty]="true"
-        emptyText="Disponible próximamente — requiere agregación de fabricaciones en el backend"
-      />
+        [loading]="cargandoConsumo()"
+        [empty]="!cargandoConsumo() && consumoChart().valores.length === 0"
+        emptyText="Registrá fabricaciones para ver el consumo de cada materia prima"
+      >
+        <reforma-apex [options]="chartConsumo()" />
+      </reforma-chart-card>
     </section>
 
     <app-catalogo-csv-bar
@@ -122,7 +126,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                 <th class="sortable" [class.is-asc]="orden.esAsc('codigo')" [class.is-desc]="orden.esDesc('codigo')" (click)="orden.alternar('codigo')">Código</th>
                 <th class="sortable" [class.is-asc]="orden.esAsc('nombre')" [class.is-desc]="orden.esDesc('nombre')" (click)="orden.alternar('nombre')">Nombre</th>
                 <th class="num sortable" [class.is-asc]="orden.esAsc('precio')" [class.is-desc]="orden.esDesc('precio')" (click)="orden.alternar('precio')">Precio/kg</th>
-                <th></th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -218,10 +222,14 @@ export class MateriasPrimasComponent implements OnInit {
   });
 
   readonly precioChart = computed(() =>
-    topConOtros(
+    topNombrado(
       this.items()
         .filter((m) => m.precioPorKilo > 0)
-        .map((m) => ({ label: m.codigoMateriaPrima, valor: m.precioPorKilo })),
+        .map((m) => ({
+          label: m.codigoMateriaPrima,
+          nombre: m.nombreMateriaPrima,
+          valor: m.precioPorKilo,
+        })),
       12,
     ),
   );
@@ -232,6 +240,33 @@ export class MateriasPrimasComponent implements OnInit {
       distributed: true,
       money: true,
       height: 280,
+      tooltipTitles: this.precioChart().nombres,
+    }),
+  );
+
+  // Consumo de cada MP en las fabricaciones registradas (reutiliza la agregación
+  // de Fabricaciones), expresado en toneladas. Eje = código, tooltip = nombre.
+  readonly consumoMaterias = signal<MateriaPrimaConsumo[]>([]);
+  readonly cargandoConsumo = signal(true);
+  readonly consumoChart = computed(() =>
+    topNombrado(
+      this.consumoMaterias()
+        .filter((c) => c.totalKg > 0)
+        .map((c) => ({
+          label: c.codigoMateriaPrima,
+          nombre: c.nombreMateriaPrima,
+          valor: Math.round((c.totalKg / 1000) * 100) / 100,
+        })),
+      12,
+    ),
+  );
+  readonly chartConsumo = computed(() =>
+    barChart({
+      categories: this.consumoChart().labels,
+      series: [{ name: 'Toneladas', data: this.consumoChart().valores }],
+      distributed: true,
+      height: 280,
+      tooltipTitles: this.consumoChart().nombres,
     }),
   );
 
@@ -260,6 +295,19 @@ export class MateriasPrimasComponent implements OnInit {
         this.error.set('No se pudieron cargar las materias primas');
         this.cargando.set(false);
       },
+    });
+    this.cargarConsumo();
+  }
+
+  /** Consumo agregado de MP en fabricaciones (para el gráfico de toneladas). */
+  private cargarConsumo(): void {
+    this.cargandoConsumo.set(true);
+    this.api.getFabricacionesConsumoMaterias(this.idGranja).subscribe({
+      next: (consumo) => {
+        this.consumoMaterias.set(consumo);
+        this.cargandoConsumo.set(false);
+      },
+      error: () => this.cargandoConsumo.set(false),
     });
   }
 

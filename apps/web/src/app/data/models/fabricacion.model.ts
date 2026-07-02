@@ -19,6 +19,13 @@ export interface FabricacionCabeceraRequest {
   observaciones?: string;
 }
 
+/** Consumo agregado de una MP en el total de fabricaciones registradas (kilos usados). */
+export interface MateriaPrimaConsumo {
+  codigoMateriaPrima: string;
+  nombreMateriaPrima: string;
+  totalKg: number;
+}
+
 export interface GuardarFabricacionDetalleRequest {
   idFormula: string;
   veces: number;

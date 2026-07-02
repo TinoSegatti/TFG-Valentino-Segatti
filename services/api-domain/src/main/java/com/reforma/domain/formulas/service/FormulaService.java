@@ -62,6 +62,14 @@ public class FormulaService {
         return FormulaCompletaResponse.from(obtenerCabecera(idGranja, idFormula));
     }
 
+    /** Uso agregado (kilos formulados) de cada MP en todas las fórmulas activas de la granja. */
+    @Transactional(readOnly = true)
+    public List<com.reforma.domain.formulas.dto.MateriaPrimaUsoResponse> usoMaterias(
+            String idUsuario, String idGranja) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        return formulaCabeceraRepository.agregarUsoMaterias(idGranja);
+    }
+
     @Transactional
     public FormulaCompletaResponse crearCabecera(
             String idUsuario, String idGranja, FormulaCabeceraRequest request) {

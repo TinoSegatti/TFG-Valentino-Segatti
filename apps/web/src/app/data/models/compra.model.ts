@@ -1,3 +1,5 @@
+import { AnomaliaEvaluacion } from './anomalia.model';
+
 export type EstadoCompra = 'BORRADOR' | 'REGISTRADA';
 
 export interface CompraCabeceraRequest {
@@ -13,6 +15,8 @@ export interface CompraDetalleLineRequest {
   cantidadKg: number;
   precioPorKilo: number;
   subtotal: number;
+  /** El usuario confirmó este precio pese a la alerta de anomalía (RF-IA-ANOM-002). Opcional. */
+  confirmoPrecio?: boolean;
 }
 
 export interface GuardarCompraDetalleRequest {
@@ -45,6 +49,13 @@ export interface CompraResumen {
   sumaSubtotales: number;
 }
 
+/** Total comprado (kilos) de una MP en el conjunto de compras registradas de la granja. */
+export interface MateriaPrimaComprada {
+  codigoMateriaPrima: string;
+  nombreMateriaPrima: string;
+  totalKg: number;
+}
+
 export interface CompraCompleta extends CompraResumen {
   observaciones?: string | null;
   lineas: CompraDetalleLine[];
@@ -62,6 +73,11 @@ export interface LineaDetalleUi {
   ultimoPrecioCatalogo: number | null;
   advertenciaLinea: string | null;
   ultimoCampoEditado: 'cantidad' | 'precio' | 'subtotal' | null;
+  /** Evaluación de anomalía de precio (RF-IA-ANOM); null si aún no se evaluó. */
+  anomalia: AnomaliaEvaluacion | null;
+  evaluandoAnomalia: boolean;
+  /** El usuario tildó "Confirmo que el precio es correcto" para una ANOMALIA_ALTA. */
+  precioConfirmado: boolean;
 }
 
 export const COMPRA_DECIMALES = 2;
@@ -146,6 +162,9 @@ export function lineaDetalleVacia(): LineaDetalleUi {
     ultimoPrecioCatalogo: null,
     advertenciaLinea: null,
     ultimoCampoEditado: null,
+    anomalia: null,
+    evaluandoAnomalia: false,
+    precioConfirmado: false,
   };
 }
 
@@ -164,6 +183,9 @@ export function lineaDesdeCompra(linea: CompraDetalleLine): LineaDetalleUi {
     ultimoPrecioCatalogo: linea.precioAnteriorMateriaPrima ?? null,
     advertenciaLinea: null,
     ultimoCampoEditado: null,
+    anomalia: null,
+    evaluandoAnomalia: false,
+    precioConfirmado: false,
   };
 }
 

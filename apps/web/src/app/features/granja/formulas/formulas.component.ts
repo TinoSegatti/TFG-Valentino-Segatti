@@ -6,8 +6,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import {
-  FormulaCompleta,
   FormulaResumen,
+  MateriaPrimaUso,
   textoConfirmacionEliminarFormula,
 } from '../../../data/models/formula.model';
 import { CsvImportResult, descargarBlobComoArchivo } from '../../../data/models/csv.model';
@@ -16,7 +16,7 @@ import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
 import { barChart, donutChart } from '../shared/apex-charts';
-import { topConOtros } from '../shared/panel-utils';
+import { topConOtros, topNombrado } from '../shared/panel-utils';
 import { OrdenTabla } from '../../../shared/orden-tabla';
 
 @Component({
@@ -55,23 +55,14 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         <reforma-apex [options]="chartCosto()" />
       </reforma-chart-card>
       <reforma-chart-card
-        [title]="detalle() ? 'Composición — ' + detalle()!.codigoFormula : 'Composición de la fórmula'"
+        title="Materias primas más usadas"
         icon="pi-chart-pie"
-        [loading]="cargandoDetalle()"
-        [empty]="!cargandoDetalle() && composicion().valores.length === 0"
-        emptyText="Sin fórmulas completas para graficar la composición"
+        [loading]="cargandoUso()"
+        [empty]="!cargandoUso() && composicion().valores.length === 0"
+        emptyText="Cargá fórmulas con ingredientes para ver las materias más usadas"
       >
         <reforma-apex [options]="chartComposicion()" />
       </reforma-chart-card>
-    </section>
-
-    <section class="rf-panel">
-      <reforma-chart-card
-        title="Evolución de costos"
-        icon="pi-chart-line"
-        [empty]="true"
-        emptyText="Disponible próximamente — requiere histórico de costos en el backend"
-      />
     </section>
 
     <app-catalogo-csv-bar
@@ -122,7 +113,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                   <th class="sortable" [class.is-asc]="orden.esAsc('animal')" [class.is-desc]="orden.esDesc('animal')" (click)="orden.alternar('animal')">Animal</th>
                   <th class="num sortable" [class.is-asc]="orden.esAsc('costo')" [class.is-desc]="orden.esDesc('costo')" (click)="orden.alternar('costo')">Costo fórmula</th>
                   <th class="sortable" [class.is-asc]="orden.esAsc('estado')" [class.is-desc]="orden.esDesc('estado')" (click)="orden.alternar('estado')">Estado</th>
-                  <th></th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,9 +229,9 @@ export class FormulasComponent implements OnInit {
   readonly formulaEliminando = signal<FormulaResumen | null>(null);
   readonly fraseEliminarEsperada = signal('');
 
-  // Detalle de una fórmula representativa para el donut de composición.
-  readonly detalle = signal<FormulaCompleta | null>(null);
-  readonly cargandoDetalle = signal(true);
+  // Uso agregado de materias primas en TODAS las fórmulas (donut de composición global).
+  readonly usoMaterias = signal<MateriaPrimaUso[]>([]);
+  readonly cargandoUso = signal(true);
 
   readonly stats = computed(() => {
     const fs = this.formulas();
@@ -261,24 +252,27 @@ export class FormulasComponent implements OnInit {
   });
 
   readonly costoPorFormula = computed(() =>
-    topConOtros(
+    topNombrado(
       this.formulas()
         .filter((f) => f.costoTotalFormula > 0)
-        .map((f) => ({ label: f.codigoFormula, valor: f.costoTotalFormula })),
+        .map((f) => ({
+          label: f.codigoFormula,
+          nombre: f.descripcionFormula,
+          valor: f.costoTotalFormula,
+        })),
       10,
     ),
   );
-  readonly composicion = computed(() => {
-    const d = this.detalle();
-    if (!d) return { labels: [] as string[], valores: [] as number[] };
-    return topConOtros(
-      d.lineas.map((l) => ({
-        label: l.codigoMateriaPrima,
-        valor: l.porcentajeFormula > 0 ? l.porcentajeFormula : l.cantidadKg,
+  // Donut de composición: la etiqueta usa el nombre de la MP para que se lea al pasar por encima.
+  readonly composicion = computed(() =>
+    topConOtros(
+      this.usoMaterias().map((u) => ({
+        label: u.nombreMateriaPrima || u.codigoMateriaPrima,
+        valor: u.totalKg,
       })),
       8,
-    );
-  });
+    ),
+  );
 
   readonly chartCosto = computed(() =>
     barChart({
@@ -287,14 +281,15 @@ export class FormulasComponent implements OnInit {
       distributed: true,
       money: true,
       height: 300,
+      tooltipTitles: this.costoPorFormula().nombres,
     }),
   );
   readonly chartComposicion = computed(() =>
     donutChart({
       labels: this.composicion().labels,
       series: this.composicion().valores,
-      totalLabel: 'Materias',
-      totalFormatter: () => String(this.composicion().labels.length),
+      totalLabel: 'Total formulado',
+      totalFormatter: (t) => Math.round(t).toLocaleString('es-AR') + ' kg',
       height: 300,
     }),
   );
@@ -352,34 +347,24 @@ export class FormulasComponent implements OnInit {
       next: (list) => {
         this.formulas.set(list);
         this.cargando.set(false);
-        this.cargarComposicion(list);
       },
       error: () => {
         this.error.set('No se pudieron cargar las formulas');
         this.cargando.set(false);
-        this.cargandoDetalle.set(false);
       },
     });
+    this.cargarUsoMaterias();
   }
 
-  /** Carga el detalle de la fórmula completa más cara para el donut de composición. */
-  private cargarComposicion(list: FormulaResumen[]): void {
-    const candidatas = list.filter((f) => f.completa);
-    const elegida = (candidatas.length > 0 ? candidatas : list).reduce(
-      (a, b) => (b.costoTotalFormula > a.costoTotalFormula ? b : a),
-      (candidatas.length > 0 ? candidatas : list)[0],
-    );
-    if (!elegida) {
-      this.cargandoDetalle.set(false);
-      return;
-    }
-    this.cargandoDetalle.set(true);
-    this.api.getFormula(this.idGranja, elegida.id).subscribe({
-      next: (d) => {
-        this.detalle.set(d);
-        this.cargandoDetalle.set(false);
+  /** Carga el uso agregado de materias primas en todas las fórmulas (donut de composición). */
+  private cargarUsoMaterias(): void {
+    this.cargandoUso.set(true);
+    this.api.getFormulasUsoMaterias(this.idGranja).subscribe({
+      next: (uso) => {
+        this.usoMaterias.set(uso);
+        this.cargandoUso.set(false);
       },
-      error: () => this.cargandoDetalle.set(false),
+      error: () => this.cargandoUso.set(false),
     });
   }
 

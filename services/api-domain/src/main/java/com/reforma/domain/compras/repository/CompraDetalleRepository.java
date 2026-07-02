@@ -1,8 +1,11 @@
 package com.reforma.domain.compras.repository;
 
 import com.reforma.domain.compras.domain.EstadoCompra;
+import com.reforma.domain.compras.dto.MateriaPrimaCompradaResponse;
 import com.reforma.domain.compras.entity.CompraDetalle;
 import com.reforma.domain.compras.support.CompraTotalesMateriaPrima;
+import com.reforma.domain.prediccion.support.AgregadoMensualMateria;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -75,4 +78,49 @@ public interface CompraDetalleRepository extends JpaRepository<CompraDetalle, St
             @Param("idGranja") String idGranja,
             @Param("idMateriaPrima") Long idMateriaPrima,
             @Param("estado") EstadoCompra estado);
+
+    /**
+     * Suma los kilos comprados de cada materia prima en TODAS las compras REGISTRADAS y activas de la
+     * granja (agregación para el gráfico "materias primas más compradas"). Ordena de mayor a menor.
+     */
+    @Query(
+            """
+            SELECT new com.reforma.domain.compras.dto.MateriaPrimaCompradaResponse(
+                cd.materiaPrima.codigoMateriaPrima,
+                cd.materiaPrima.nombreMateriaPrima,
+                SUM(cd.cantidadComprada))
+            FROM CompraDetalle cd
+            JOIN cd.compra c
+            WHERE c.granja.id = :idGranja
+              AND c.activo = true
+              AND c.estado = :estado
+            GROUP BY cd.materiaPrima.id, cd.materiaPrima.codigoMateriaPrima, cd.materiaPrima.nombreMateriaPrima
+            ORDER BY SUM(cd.cantidadComprada) DESC
+            """)
+    List<MateriaPrimaCompradaResponse> agregarComprasMaterias(
+            @Param("idGranja") String idGranja, @Param("estado") EstadoCompra estado);
+
+    /**
+     * Ingresos (kilos comprados) por materia prima y mes ({@code "YYYY-MM"}, UTC) desde {@code desde},
+     * sobre compras REGISTRADAS y activas de la granja. Base de la serie mensual de la predicción de
+     * agotamiento (RF-IA-PRED).
+     */
+    @Query(
+            """
+            SELECT new com.reforma.domain.prediccion.support.AgregadoMensualMateria(
+                cd.materiaPrima.id,
+                CAST(FUNCTION('to_char', c.fechaCompra, 'YYYY-MM') AS string),
+                SUM(cd.cantidadComprada))
+            FROM CompraDetalle cd
+            JOIN cd.compra c
+            WHERE c.granja.id = :idGranja
+              AND c.activo = true
+              AND c.estado = :estado
+              AND c.fechaCompra >= :desde
+            GROUP BY cd.materiaPrima.id, CAST(FUNCTION('to_char', c.fechaCompra, 'YYYY-MM') AS string)
+            """)
+    List<AgregadoMensualMateria> ingresosMensualesPorMateria(
+            @Param("idGranja") String idGranja,
+            @Param("estado") EstadoCompra estado,
+            @Param("desde") Instant desde);
 }

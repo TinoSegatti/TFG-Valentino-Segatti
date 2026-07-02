@@ -6,8 +6,10 @@ import com.reforma.domain.fabricaciones.dto.FabricacionCabeceraRequest;
 import com.reforma.domain.fabricaciones.dto.FabricacionCompletaResponse;
 import com.reforma.domain.fabricaciones.dto.FabricacionResumenResponse;
 import com.reforma.domain.fabricaciones.dto.GuardarFabricacionDetalleRequest;
+import com.reforma.domain.fabricaciones.dto.MateriaPrimaConsumoResponse;
 import com.reforma.domain.fabricaciones.entity.Fabricacion;
 import com.reforma.domain.fabricaciones.entity.FabricacionDetalle;
+import com.reforma.domain.fabricaciones.repository.FabricacionDetalleRepository;
 import com.reforma.domain.fabricaciones.repository.FabricacionRepository;
 import com.reforma.domain.fabricaciones.support.FabricacionCalculo;
 import com.reforma.domain.formulas.entity.FormulaCabecera;
@@ -40,6 +42,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class FabricacionService {
 
     private final FabricacionRepository fabricacionRepository;
+    private final FabricacionDetalleRepository fabricacionDetalleRepository;
     private final FormulaCabeceraRepository formulaCabeceraRepository;
     private final GranjaRepository granjaRepository;
     private final UsuarioRepository usuarioRepository;
@@ -59,6 +62,13 @@ public class FabricacionService {
     public FabricacionCompletaResponse obtener(String idUsuario, String idGranja, String idFabricacion) {
         granjaAccesoService.validarAcceso(idUsuario, idGranja);
         return FabricacionCompletaResponse.from(obtenerFabricacion(idGranja, idFabricacion));
+    }
+
+    /** Consumo agregado (kilos usados) de cada MP en las fabricaciones registradas de la granja. */
+    @Transactional(readOnly = true)
+    public List<MateriaPrimaConsumoResponse> consumoMaterias(String idUsuario, String idGranja) {
+        granjaAccesoService.validarAcceso(idUsuario, idGranja);
+        return fabricacionDetalleRepository.agregarConsumoMaterias(idGranja);
     }
 
     @Transactional

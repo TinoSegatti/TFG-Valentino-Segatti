@@ -134,7 +134,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                 <th class="sortable" [class.is-asc]="orden.esAsc('descripcion')" [class.is-desc]="orden.esDesc('descripcion')" (click)="orden.alternar('descripcion')">Descripción</th>
                 <th class="sortable" [class.is-asc]="orden.esAsc('categoria')" [class.is-desc]="orden.esDesc('categoria')" (click)="orden.alternar('categoria')">Categoría</th>
                 <th class="sortable" [class.is-asc]="orden.esAsc('observaciones')" [class.is-desc]="orden.esDesc('observaciones')" (click)="orden.alternar('observaciones')">Observaciones</th>
-                <th></th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>

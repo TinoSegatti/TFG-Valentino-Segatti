@@ -13,7 +13,7 @@ import { KpiCardComponent } from '../shared/kpi-card.component';
 import { ChartCardComponent } from '../shared/chart-card.component';
 import { ApexChartComponent } from '../shared/apex-chart.component';
 import { barChart } from '../shared/apex-charts';
-import { topConOtros } from '../shared/panel-utils';
+import { topNombrado } from '../shared/panel-utils';
 import { OrdenTabla } from '../../../shared/orden-tabla';
 
 /**
@@ -137,7 +137,7 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
                 <th class="sortable" [class.is-asc]="orden.esAsc('nombre')" [class.is-desc]="orden.esDesc('nombre')" (click)="orden.alternar('nombre')">Nombre</th>
                 <th class="sortable" [class.is-asc]="orden.esAsc('telefono')" [class.is-desc]="orden.esDesc('telefono')" (click)="orden.alternar('telefono')">Teléfono</th>
                 <th class="sortable" [class.is-asc]="orden.esAsc('localidad')" [class.is-desc]="orden.esDesc('localidad')" (click)="orden.alternar('localidad')">Localidad</th>
-                <th></th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -268,10 +268,10 @@ export class ProveedoresComponent implements OnInit {
     barChart({
       categories: this.gastoPorProveedor().labels,
       series: [{ name: 'Gasto', data: this.gastoPorProveedor().valores }],
-      horizontal: true,
       distributed: true,
       money: true,
       height: 300,
+      tooltipTitles: this.gastoPorProveedor().nombres,
     }),
   );
   readonly chartCompras = computed(() =>
@@ -280,17 +280,25 @@ export class ProveedoresComponent implements OnInit {
       series: [{ name: 'Compras', data: this.comprasPorProveedor().valores }],
       distributed: true,
       height: 300,
+      tooltipTitles: this.comprasPorProveedor().nombres,
     }),
   );
 
+  /**
+   * Agrupa las compras por proveedor. El eje muestra el código del proveedor
+   * (`labels`) y el tooltip su nombre completo (`nombres`); ambos gráficos son
+   * columnas verticales (el gasto en dinero se formatea en el eje Y de valores).
+   */
   private agruparCompras(valor: (c: CompraResumen) => number, n: number) {
-    const acum = new Map<string, number>();
+    const acum = new Map<string, { nombre: string; valor: number }>();
     for (const c of this.compras()) {
-      const label = c.nombreProveedor || c.codigoProveedor || '—';
-      acum.set(label, (acum.get(label) ?? 0) + valor(c));
+      const codigo = c.codigoProveedor || c.nombreProveedor || '—';
+      const nombre = c.nombreProveedor || c.codigoProveedor || '—';
+      const prev = acum.get(codigo);
+      acum.set(codigo, { nombre, valor: (prev?.valor ?? 0) + valor(c) });
     }
-    return topConOtros(
-      [...acum.entries()].map(([label, v]) => ({ label, valor: v })),
+    return topNombrado(
+      [...acum.entries()].map(([label, { nombre, valor: v }]) => ({ label, nombre, valor: v })),
       n,
     );
   }

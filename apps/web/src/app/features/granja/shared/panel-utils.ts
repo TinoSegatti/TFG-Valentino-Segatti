@@ -71,3 +71,31 @@ export function topConOtros(
     valores: [...top.map((e) => e.valor), Math.round(resto * 100) / 100],
   };
 }
+
+/**
+ * Como {@link topConOtros}, pero conserva un `nombre` descriptivo paralelo a cada
+ * `label`. Pensado para gráficos donde el eje muestra el código corto (`labels`) y
+ * el tooltip el nombre completo (`nombres`). El bucket agregado usa `etiquetaOtros`
+ * en ambos.
+ */
+export function topNombrado(
+  entradas: { label: string; nombre: string; valor: number }[],
+  n: number,
+  etiquetaOtros = 'Otros',
+): { labels: string[]; nombres: string[]; valores: number[] } {
+  const orden = [...entradas].sort((a, b) => b.valor - a.valor);
+  if (orden.length <= n) {
+    return {
+      labels: orden.map((e) => e.label),
+      nombres: orden.map((e) => e.nombre),
+      valores: orden.map((e) => e.valor),
+    };
+  }
+  const top = orden.slice(0, n);
+  const resto = orden.slice(n).reduce((s, e) => s + e.valor, 0);
+  return {
+    labels: [...top.map((e) => e.label), etiquetaOtros],
+    nombres: [...top.map((e) => e.nombre), etiquetaOtros],
+    valores: [...top.map((e) => e.valor), Math.round(resto * 100) / 100],
+  };
+}

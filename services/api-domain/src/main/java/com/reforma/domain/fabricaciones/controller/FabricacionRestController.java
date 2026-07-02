@@ -5,6 +5,7 @@ import com.reforma.domain.fabricaciones.dto.FabricacionCabeceraRequest;
 import com.reforma.domain.fabricaciones.dto.FabricacionCompletaResponse;
 import com.reforma.domain.fabricaciones.dto.FabricacionResumenResponse;
 import com.reforma.domain.fabricaciones.dto.GuardarFabricacionDetalleRequest;
+import com.reforma.domain.fabricaciones.dto.MateriaPrimaConsumoResponse;
 import com.reforma.domain.fabricaciones.service.FabricacionService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -31,6 +32,15 @@ public class FabricacionRestController {
     @GetMapping
     public List<FabricacionResumenResponse> listar(@PathVariable String idGranja) {
         return fabricacionService.listar(SecurityUtils.requireTenantId(), idGranja);
+    }
+
+    /**
+     * Consumo agregado de materias primas en todas las fabricaciones registradas (kilos por MP).
+     * Ruta literal: Spring la prioriza sobre la variable {@code /{idFabricacion}}.
+     */
+    @GetMapping("/consumo-materias")
+    public List<MateriaPrimaConsumoResponse> consumoMaterias(@PathVariable String idGranja) {
+        return fabricacionService.consumoMaterias(SecurityUtils.requireTenantId(), idGranja);
     }
 
     @GetMapping("/{idFabricacion}")
