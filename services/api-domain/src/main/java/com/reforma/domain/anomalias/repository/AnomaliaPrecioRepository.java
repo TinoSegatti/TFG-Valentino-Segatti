@@ -24,4 +24,14 @@ public interface AnomaliaPrecioRepository extends JpaRepository<AnomaliaPrecio, 
             Pageable pageable);
 
     Optional<AnomaliaPrecio> findByIdAndCompra_Granja_Id(String id, String idGranja);
+
+    /** Anomalías cuyas compras caen en el período (informe de estado, RF-REP-003). */
+    @Query("select a from AnomaliaPrecio a "
+            + "where a.compra.granja.id = :idGranja "
+            + "and a.compra.fechaCompra between :desde and :hasta "
+            + "order by a.compra.fechaCompra desc")
+    List<AnomaliaPrecio> listarPorGranjaYPeriodo(
+            @Param("idGranja") String idGranja,
+            @Param("desde") java.time.Instant desde,
+            @Param("hasta") java.time.Instant hasta);
 }

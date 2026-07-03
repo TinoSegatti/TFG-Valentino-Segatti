@@ -8,4 +8,7 @@ public interface PrediccionStockRepository extends JpaRepository<PrediccionStock
 
     /** Fila vigente de una MP en la granja (para el upsert find-then-save). */
     Optional<PrediccionStock> findByGranjaIdAndMateriaPrimaId(String idGranja, Long idMateriaPrima);
+
+    /** Predicciones vigentes de la granja (informe de estado, RF-REP-001). */
+    java.util.List<PrediccionStock> findByGranjaId(String idGranja);
 }
