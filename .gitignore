@@ -17,6 +17,7 @@ docs/GUIA_PRUEBAS_MANUALES_USUARIOS.md
 docs/PRECIO_ALMACEN.md
 docs/PLAN_ML_ANOMALIAS_PRECIO.md
 docs/PLAN_ML_PREDICCION_STOCK.md
+docs/PLAN_MODULOS_FINALES.md
 
 # --- Java / Maven (api-domain) ---
 services/api-domain/target/
