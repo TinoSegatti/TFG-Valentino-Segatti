@@ -20,5 +20,9 @@ public enum AccionAuditoria {
     CREAR_EMPLEADO,
     ACEPTAR_INVITACION,
     CAMBIO_ROL_EMPLEADO,
-    DESACTIVAR_EMPLEADO
+    DESACTIVAR_EMPLEADO,
+    // Módulo Archivos — snapshot inmutable creado (t_archivo, V013)
+    ARCHIVO_CREADO,
+    // Módulo Reportes — informe de estado generado (RF-REP)
+    INFORME_GENERADO
 }

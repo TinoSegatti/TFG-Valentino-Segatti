@@ -48,7 +48,9 @@ public class SecurityConfig {
         "/api/compras/**",
         "/api/formulas/**",
         "/api/fabricaciones/**",
-        "/api/inventario/**"
+        "/api/inventario/**",
+        "/api/archivos/**",
+        "/api/reportes/**"
     };
 
     private static final String[] ROLES_ESCRITURA = {"OWNER", "ADMIN", "EDITOR"};

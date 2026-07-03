@@ -59,6 +59,15 @@ class PlanServiceTest {
     }
 
     @Test
+    void limiteArchivosPorPlan() {
+        assertThat(planService.limiteArchivos(PlanSuscripcion.DEMO)).isEqualTo(3);
+        assertThat(planService.limiteArchivos(PlanSuscripcion.STARTER)).isEqualTo(10);
+        assertThat(planService.limiteArchivos(PlanSuscripcion.BUSINESS)).isEqualTo(50);
+        assertThat(planService.limiteArchivos(PlanSuscripcion.ENTERPRISE))
+                .isEqualTo(Integer.MAX_VALUE);
+    }
+
+    @Test
     void limiteEmpleadosPorPlan() {
         // DEMO habilita 2 invitaciones para el recorrido de prueba (ver PlanService#limiteEmpleados).
         assertThat(planService.limiteEmpleados(PlanSuscripcion.DEMO)).isEqualTo(2);

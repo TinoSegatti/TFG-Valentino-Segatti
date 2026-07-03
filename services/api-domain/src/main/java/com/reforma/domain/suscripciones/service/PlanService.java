@@ -105,6 +105,19 @@ public class PlanService {
     }
 
     /**
+     * Módulo Archivos: límite de snapshots inmutables por granja. Como los archivos no se
+     * borran nunca (registro histórico), el tope cuenta el total acumulado de la granja.
+     */
+    public int limiteArchivos(PlanSuscripcion plan) {
+        return switch (plan) {
+            case DEMO -> 3;
+            case STARTER -> 10;
+            case BUSINESS -> 50;
+            case ENTERPRISE -> Integer.MAX_VALUE;
+        };
+    }
+
+    /**
      * RD-03: la predicción de agotamiento de stock (RF-IA-PRED) es un diferenciador de los planes
      * pagos superiores. Solo BUSINESS y ENTERPRISE la tienen habilitada.
      */
