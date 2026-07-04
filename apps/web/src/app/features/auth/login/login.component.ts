@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
+import { TemaService } from '../../../core/tema/tema.service';
 
 @Component({
   selector: 'app-login',
@@ -100,6 +101,7 @@ import { AuthStateService } from '../../../core/auth/auth-state.service';
 export class LoginComponent implements OnInit {
   private readonly api = inject(ReformaApiService);
   private readonly auth = inject(AuthStateService);
+  private readonly tema = inject(TemaService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -123,6 +125,8 @@ export class LoginComponent implements OnInit {
     this.api.login(this.email, this.password).subscribe({
       next: (res) => {
         this.auth.setSession(res.token);
+        // Trae y aplica la personalización del usuario que acaba de entrar (RD-C1).
+        this.tema.inicializar();
         this.router.navigate(['/mis-plantas']);
       },
       error: (err) => {

@@ -23,6 +23,12 @@ export class AuthStateService {
   clearSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     this.tokenSignal.set(null);
+    // Personalización: el fondo es del usuario, no del dispositivo — al salir se limpia
+    // el cache y se restauran las custom properties para que el login vea el default.
+    // (Directo acá, sin inyectar TemaService, para no acoplar auth → api.)
+    localStorage.removeItem('reforma_prefs');
+    document.documentElement.style.removeProperty('--app-fondo');
+    document.documentElement.style.removeProperty('--app-cortina');
   }
 
   getAuthorizationHeader(): string | null {

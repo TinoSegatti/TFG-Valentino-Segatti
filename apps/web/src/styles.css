@@ -99,7 +99,26 @@ h1, h2, h3 {
 /* ----------------------------------------------------------------------------
    Overlays de fondo (fixed, detrás de todo el contenido) — dan profundidad.
    Se montan una vez en app.component.
+
+   Personalización (RD-C4): --app-fondo / --app-cortina las setea TemaService en
+   el elemento raíz. Sin personalizar, .app-bg-fondo queda vacía y la cortina en 0.
+   La cortina rgba(15,23,42,α) con α >= 0.35 garantiza el contraste del texto
+   claro sobre cualquier fondo de la galería (RD-C3).
    ---------------------------------------------------------------------------- */
+.app-bg-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: -4;
+  pointer-events: none;
+  background: var(--app-fondo, none) center / cover no-repeat;
+}
+.app-bg-cortina {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  background: rgba(15, 23, 42, var(--app-cortina, 0));
+}
 .app-bg-gradient {
   position: fixed;
   inset: 0;

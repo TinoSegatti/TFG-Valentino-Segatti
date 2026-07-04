@@ -2,6 +2,7 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ReformaApiService } from '../../data/api/reforma-api.service';
 import { Perfil } from '../../data/models/usuario.model';
 import { AccountNavComponent } from '../../shared/account-nav.component';
+import { PersonalizacionComponent } from './personalizacion.component';
 
 const ROL_LABEL: Record<string, string> = {
   OWNER: 'Dueño',
@@ -13,7 +14,7 @@ const ROL_LABEL: Record<string, string> = {
 @Component({
   selector: 'app-perfil',
   standalone: true,
-  imports: [AccountNavComponent],
+  imports: [AccountNavComponent, PersonalizacionComponent],
   template: `
     <app-account-nav />
 
@@ -63,6 +64,8 @@ const ROL_LABEL: Record<string, string> = {
             }
           </section>
         </div>
+
+        <app-personalizacion />
         }
       }
     </div>
