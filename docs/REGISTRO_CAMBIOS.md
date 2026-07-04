@@ -17,6 +17,53 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-07-03 — Módulos finales: Archivos (activación), Informe de Estado (RF-REP) y Personalización
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** cierre de los 3 módulos de `docs/PLAN_MODULOS_FINALES.md`.
+  - **Módulo A — Archivos (activación y validación).** El código (backend `domain/archivos` + V013 +
+    frontend explorador/modal) venía de la sesión del 2026-07-02 pero la imagen de api-domain nunca se
+    había rebuildeado (trampa #1). Se rebuildeó: **V013 aplicada**, smoke completo OK (alta por los 3
+    módulos con 32/38/47 registros, 409 por código duplicado, listado/detalle con JSONB, auditoría
+    `ARCHIVO_CREADO`).
+  - **Módulo B — Informe de Estado (RF-REP-001/002/003).** Backend `domain/reporte` (venía escrito;
+    se validó y se agregó fallback `SIN_FORMULA` para fabricaciones sin fórmula, p. ej. consumos
+    sembrados). **Frontend nuevo:** `features/granja/informe/informe.component.ts` (selector de período
+    30/90/365/custom con auto-generación, 6 secciones con KPIs/gráficos Apex/tablas, botón CSV por
+    sección, upsell IA para planes sin predicción) + `informe-html.builder.ts` (**HTML autocontenido**:
+    CSS inline + gráficos SVG generados desde los datos, abre por file:// sin red). Ruta
+    `granja/:id/informe` + entrada "Informe de estado" en el menú lateral. Smoke backend: informe 90
+    días coherente con las pantallas, 400 con período invertido, CSV de las 5 secciones
+    (PROVEEDORES/INVENTARIO/COMPRAS/CONSUMOS/ANOMALIAS) con Content-Disposition correcto.
+  - **Módulo C — Personalización (fondo + cortina + imagen propia).** Backend: **V014**
+    (`t_usuarios.preferencias_ui` JSONB), `PreferenciasUiService` (whitelist de 9 fondos curados
+    **+ fondo `personalizada`**: imagen del usuario como data URL `image/png|jpeg|webp` con tope
+    ~1 MB, nunca URLs externas; α ∈ [0.35, 0.85] — RD-C3; defaults y degradación ante JSON
+    corrupto/fondo retirado/personalizada sin imagen), `GET/PUT /api/usuarios/preferencias` en
+    `UsuarioAuthRestController`, 13 tests nuevos. Frontend: `core/tema/tema.service.ts` (galería
+    `FONDOS_TEMA` con colores/gradientes CSS + imagen propia vía `url(data:...)`, cache
+    `localStorage['reforma_prefs']` aplicado pre-render sin flash + sync con API), capas
+    `.app-bg-fondo`/`.app-bg-cortina` en `app.component` vía custom properties
+    `--app-fondo`/`--app-cortina` (RD-C4) — **la cortina se aplica siempre, también sobre la
+    imagen propia**, garantizando legibilidad con imágenes claras —, sección "Personalización"
+    en Perfil (`personalizacion.component.ts`: galería + tile "Imagen propia" con file picker
+    que **reescala a 1920 px y comprime a JPEG en el navegador** hasta entrar en el tope +
+    slider con preview en vivo, Guardar/Restablecer, descarte de preview al salir), refresh
+    tras login y limpieza en logout (`clearSession`). Smoke API: GET default, PUT galería y PUT
+    personalizada persisten, fondo fuera de whitelist → 400, α fuera de rango → 400,
+    personalizada sin imagen → 400, imagen no-data-URL → 400.
+  - **Fix de datos (dev):** backfill de snapshots NULL previos a ADR 0005 (37 líneas de compra +
+    72 detalles de fabricación) desde el catálogo — el informe agrupaba por clave null.
+- **Archivos principales:** `services/api-domain/.../reporte/service/InformeEstadoService.java`,
+  `.../usuarios/{entity/Usuario,dto/PreferenciasUi*,service/PreferenciasUiService,controller/UsuarioAuthRestController}.java`,
+  `db/migration/V014__preferencias_ui.sql`, `apps/web/.../features/granja/informe/{informe.component,informe-html.builder}.ts`,
+  `apps/web/.../core/tema/tema.service.ts`, `apps/web/.../features/perfil/{perfil,personalizacion}.component.ts`,
+  `apps/web/src/{styles.css,app/app.component.ts}`, `core/auth/auth-state.service.ts`,
+  `data/{models/preferencias.model.ts,api/reforma-api.service.ts}`, `app.routes.ts`, `granja-shell.component.ts`.
+- **Verificación:** suite backend **237/237 verde** en contenedor Maven; `docker compose build web` OK y
+  contenedor recreado (UIs presentes en el bundle servido); Flyway al día (V014); smokes API descritos arriba.
+- **Pendiente:** smoke visual en navegador (informe + galería de fondos + HTML descargado por file://);
+  commit/push cuando el usuario lo pida (commits sugeridos en el plan §D).
+
 ### 2026-07-02 — IA predicción (UI): zoom en el gráfico del popup
 - **Autor/agente:** Claude Code (Opus 4.8)
 - **Qué:** el gráfico de predicción de agotamiento ahora permite **zoom nativo de ApexCharts**:
