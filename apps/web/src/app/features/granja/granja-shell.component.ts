@@ -38,6 +38,8 @@ import { AccountNavComponent, AccountNavBack } from '../../shared/account-nav.co
           <a routerLink="formulas" routerLinkActive="active"><i class="pi pi-sliders-h"></i><span>Fórmulas</span><b class="dot"></b></a>
           <a routerLink="fabricaciones" routerLinkActive="active"><i class="pi pi-cog"></i><span>Fabricaciones</span><b class="dot"></b></a>
           <a routerLink="inventario" routerLinkActive="active"><i class="pi pi-warehouse"></i><span>Inventario</span><b class="dot"></b></a>
+          <a routerLink="archivos" routerLinkActive="active"><i class="pi pi-history"></i><span>Archivos</span><b class="dot"></b></a>
+          <a routerLink="informe" routerLinkActive="active"><i class="pi pi-chart-line"></i><span>Informe de estado</span><b class="dot"></b></a>
         </nav>
 
         <div class="plan glass-card-strong">

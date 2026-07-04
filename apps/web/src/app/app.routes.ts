@@ -180,6 +180,25 @@ export const routes: Routes = [
             (m) => m.InventarioComponent,
           ),
       },
+      {
+        path: 'informe',
+        loadComponent: () =>
+          import('./features/granja/informe/informe.component').then((m) => m.InformeComponent),
+      },
+      {
+        path: 'archivos',
+        loadComponent: () =>
+          import('./features/granja/archivos/archivos.component').then(
+            (m) => m.ArchivosComponent,
+          ),
+      },
+      {
+        path: 'archivos/:idArchivo',
+        loadComponent: () =>
+          import('./features/granja/archivos/archivo-detalle.component').then(
+            (m) => m.ArchivoDetalleComponent,
+          ),
+      },
       { path: 'iventario', redirectTo: 'inventario', pathMatch: 'full' },
       { path: '**', redirectTo: 'resumen' },
     ],
