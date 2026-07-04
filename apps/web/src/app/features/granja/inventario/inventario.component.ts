@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { mensajeErrorHttp } from '../../../core/http/api-error.util';
 import { ReformaApiService } from '../../../data/api/reforma-api.service';
@@ -13,6 +13,8 @@ import { ApexChartComponent } from '../shared/apex-chart.component';
 import { barChart, donutChart, lineChart, ReformaChartOptions } from '../shared/apex-charts';
 import { topConOtros, topNombrado } from '../shared/panel-utils';
 import { NumeroFormatoDirective } from '../../../shared/numero-formato.directive';
+import { ArchivoCrearModalComponent } from '../shared/archivo-crear-modal.component';
+import { ArchivoResumen } from '../../../data/models/archivo.model';
 import { OrdenTabla } from '../../../shared/orden-tabla';
 import { AuthStateService } from '../../../core/auth/auth-state.service';
 import { decodeJwtClaims } from '../../../core/auth/jwt.utils';
@@ -46,6 +48,8 @@ type OrdenInicializacion = 'nombre' | 'codigo';
     ChartCardComponent,
     ApexChartComponent,
     NumeroFormatoDirective,
+    ArchivoCrearModalComponent,
+    RouterLink,
   ],
   template: `
     <header class="toolbar">
@@ -59,6 +63,9 @@ type OrdenInicializacion = 'nombre' | 'codigo';
             <i class="pi pi-sliders-h"></i> Inicializar inventario
           </button>
         } @else {
+          <button type="button" class="reforma-btn-ghost" (click)="archivoModal.set(true)" [disabled]="cargando()">
+            <i class="pi pi-history"></i> Crear archivo
+          </button>
           <button type="button" class="reforma-btn-ghost" (click)="recalcular()" [disabled]="cargando()">
             <i class="pi pi-refresh"></i> Recalcular
           </button>
@@ -179,6 +186,23 @@ type OrdenInicializacion = 'nombre' | 'codigo';
 
     @if (error()) {
       <p class="reforma-alert reforma-alert-error"><i class="pi pi-exclamation-circle"></i> {{ error() }}</p>
+    }
+
+    @if (archivoOk(); as a) {
+      <p class="reforma-alert reforma-alert-ok">
+        <i class="pi pi-check-circle"></i> Archivo {{ a.codigoArchivo }} creado.
+        <a routerLink="../archivos">Ver archivos</a>
+      </p>
+    }
+
+    <!-- Modal: crear archivo (snapshot inmutable del inventario) -->
+    @if (archivoModal()) {
+      <app-archivo-crear-modal
+        tipo="INVENTARIO"
+        [idGranja]="idGranja"
+        (creado)="archivoCreado($event)"
+        (cerrado)="archivoModal.set(false)"
+      />
     }
 
     <!-- Modal: editar cantidad real -->
@@ -602,6 +626,9 @@ export class InventarioComponent implements OnInit {
   observacionesEdit = '';
   readonly guardandoEdicion = signal(false);
 
+  readonly archivoModal = signal(false);
+  readonly archivoOk = signal<ArchivoResumen | null>(null);
+
   readonly modoInicializar = signal(false);
   readonly lineasIni = signal<LineaInicializacion[]>([this.lineaVacia()]);
   readonly guardandoIni = signal(false);
@@ -750,8 +777,13 @@ export class InventarioComponent implements OnInit {
     return Math.max(0, this.cantidadRealEdit) * item.precioPorKilo;
   });
 
-  private get idGranja(): string {
+  protected get idGranja(): string {
     return this.route.parent?.snapshot.paramMap.get('idGranja') ?? '';
+  }
+
+  archivoCreado(archivo: ArchivoResumen): void {
+    this.archivoModal.set(false);
+    this.archivoOk.set(archivo);
   }
 
   ngOnInit(): void {

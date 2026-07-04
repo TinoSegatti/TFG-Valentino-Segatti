@@ -16,6 +16,8 @@ import { ApexChartComponent } from '../shared/apex-chart.component';
 import { areaChart, donutChart } from '../shared/apex-charts';
 import { sumarPorMes, topConOtros } from '../shared/panel-utils';
 import { OrdenTabla } from '../../../shared/orden-tabla';
+import { ArchivoCrearModalComponent } from '../shared/archivo-crear-modal.component';
+import { ArchivoResumen } from '../../../data/models/archivo.model';
 
 @Component({
   selector: 'app-compras',
@@ -27,12 +29,34 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
     KpiCardComponent,
     ChartCardComponent,
     ApexChartComponent,
+    ArchivoCrearModalComponent,
   ],
   template: `
     <header class="reforma-toolbar">
       <h2 class="reforma-page-title">Compras</h2>
-      <a routerLink="nueva" class="reforma-btn"><i class="pi pi-plus"></i> Nueva factura</a>
+      <div class="acciones-toolbar">
+        <button type="button" class="reforma-btn-ghost" (click)="archivoModal.set(true)">
+          <i class="pi pi-history"></i> Crear archivo
+        </button>
+        <a routerLink="nueva" class="reforma-btn"><i class="pi pi-plus"></i> Nueva factura</a>
+      </div>
     </header>
+
+    @if (archivoOk(); as a) {
+      <p class="reforma-alert reforma-alert-ok">
+        <i class="pi pi-check-circle"></i> Archivo {{ a.codigoArchivo }} creado.
+        <a routerLink="../archivos">Ver archivos</a>
+      </p>
+    }
+
+    @if (archivoModal()) {
+      <app-archivo-crear-modal
+        tipo="COMPRAS"
+        [idGranja]="idGranja"
+        (creado)="archivoCreado($event)"
+        (cerrado)="archivoModal.set(false)"
+      />
+    }
 
     <section class="rf-grid-kpis">
       <reforma-kpi-card style="--rf-i: 0" icon="pi-shopping-cart" label="Compras" [value]="stats().total | number: '1.0-0'" />
@@ -150,6 +174,12 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
       :host {
         display: block;
       }
+      .acciones-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
       .eliminar {
         margin: 1.25rem 0;
       }
@@ -220,6 +250,8 @@ export class ComprasComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly compraEliminando = signal<CompraResumen | null>(null);
   readonly fraseEliminarEsperada = signal('');
+  readonly archivoModal = signal(false);
+  readonly archivoOk = signal<ArchivoResumen | null>(null);
 
   textoConfirmacionEliminar = '';
 
@@ -270,12 +302,17 @@ export class ComprasComponent implements OnInit {
     }),
   );
 
-  private get idGranja(): string {
+  protected get idGranja(): string {
     return this.route.parent?.snapshot.paramMap.get('idGranja') ?? '';
   }
 
   ngOnInit(): void {
     this.recargarCompras();
+  }
+
+  archivoCreado(archivo: ArchivoResumen): void {
+    this.archivoModal.set(false);
+    this.archivoOk.set(archivo);
   }
 
   iniciarEliminar(c: CompraResumen): void {

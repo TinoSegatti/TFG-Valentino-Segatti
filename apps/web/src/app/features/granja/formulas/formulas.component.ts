@@ -18,6 +18,8 @@ import { ApexChartComponent } from '../shared/apex-chart.component';
 import { barChart, donutChart } from '../shared/apex-charts';
 import { topConOtros, topNombrado } from '../shared/panel-utils';
 import { OrdenTabla } from '../../../shared/orden-tabla';
+import { ArchivoCrearModalComponent } from '../shared/archivo-crear-modal.component';
+import { ArchivoResumen } from '../../../data/models/archivo.model';
 
 @Component({
   selector: 'app-formulas',
@@ -30,12 +32,34 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
     KpiCardComponent,
     ChartCardComponent,
     ApexChartComponent,
+    ArchivoCrearModalComponent,
   ],
   template: `
     <header class="reforma-toolbar">
       <h2 class="reforma-page-title">Fórmulas dietarias</h2>
-      <a routerLink="nueva" class="reforma-btn"><i class="pi pi-plus"></i> Crear fórmula</a>
+      <div class="acciones-toolbar">
+        <button type="button" class="reforma-btn-ghost" (click)="archivoModal.set(true)">
+          <i class="pi pi-history"></i> Crear archivo
+        </button>
+        <a routerLink="nueva" class="reforma-btn"><i class="pi pi-plus"></i> Crear fórmula</a>
+      </div>
     </header>
+
+    @if (archivoOk(); as a) {
+      <p class="reforma-alert reforma-alert-ok">
+        <i class="pi pi-check-circle"></i> Archivo {{ a.codigoArchivo }} creado.
+        <a routerLink="../archivos">Ver archivos</a>
+      </p>
+    }
+
+    @if (archivoModal()) {
+      <app-archivo-crear-modal
+        tipo="FORMULAS"
+        [idGranja]="idGranja"
+        (creado)="archivoCreado($event)"
+        (cerrado)="archivoModal.set(false)"
+      />
+    }
 
     <section class="rf-grid-kpis">
       <reforma-kpi-card style="--rf-i: 0" icon="pi-sliders-h" label="Fórmulas" [value]="stats().total | number: '1.0-0'" />
@@ -205,6 +229,12 @@ import { OrdenTabla } from '../../../shared/orden-tabla';
         background: rgba(251, 191, 36, 0.16);
         color: #fde68a;
       }
+      .acciones-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
     `,
   ],
 })
@@ -228,6 +258,8 @@ export class FormulasComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly formulaEliminando = signal<FormulaResumen | null>(null);
   readonly fraseEliminarEsperada = signal('');
+  readonly archivoModal = signal(false);
+  readonly archivoOk = signal<ArchivoResumen | null>(null);
 
   // Uso agregado de materias primas en TODAS las fórmulas (donut de composición global).
   readonly usoMaterias = signal<MateriaPrimaUso[]>([]);
@@ -300,12 +332,17 @@ export class FormulasComponent implements OnInit {
 
   textoConfirmacionEliminar = '';
 
-  private get idGranja(): string {
+  protected get idGranja(): string {
     return this.route.parent?.snapshot.paramMap.get('idGranja') ?? '';
   }
 
   ngOnInit(): void {
     this.recargar();
+  }
+
+  archivoCreado(archivo: ArchivoResumen): void {
+    this.archivoModal.set(false);
+    this.archivoOk.set(archivo);
   }
 
   iniciarEliminar(f: FormulaResumen): void {
