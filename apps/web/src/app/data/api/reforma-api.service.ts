@@ -42,6 +42,14 @@ import {
   EvaluarAnomaliaRequest,
 } from '../models/anomalia.model';
 import { PrediccionStock, PrediccionStockDetalle } from '../models/prediccion.model';
+import {
+  ArchivoCrearRequest,
+  ArchivoDetalle,
+  ArchivoResumen,
+  TipoModuloArchivo,
+} from '../models/archivo.model';
+import { InformeEstado, SeccionInformeCsv } from '../models/informe.model';
+import { PreferenciasUi } from '../models/preferencias.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -104,6 +112,15 @@ export class ReformaApiService {
   /** Perfil del usuario autenticado (identidad, rol y permisos). */
   getPerfil(): Observable<Perfil> {
     return this.http.get<Perfil>(`${this.base}/api/usuarios/perfil`);
+  }
+
+  // === Preferencias de UI (Personalización: fondo + cortina) ===
+  getPreferenciasUi(): Observable<PreferenciasUi> {
+    return this.http.get<PreferenciasUi>(`${this.base}/api/usuarios/preferencias`);
+  }
+
+  putPreferenciasUi(prefs: PreferenciasUi): Observable<PreferenciasUi> {
+    return this.http.put<PreferenciasUi>(`${this.base}/api/usuarios/preferencias`, prefs);
   }
 
   // === Empleados (gestión de equipo: dueño y jefe ADMIN) ===
@@ -475,6 +492,46 @@ export class ReformaApiService {
       `${this.base}/api/inventario/${idGranja}/recalcular`,
       {},
     );
+  }
+
+  // === Reportes (informe de estado, RF-REP) ===
+  getInformeEstado(idGranja: string, desde?: string, hasta?: string): Observable<InformeEstado> {
+    let params = new HttpParams();
+    if (desde) params = params.set('desde', desde);
+    if (hasta) params = params.set('hasta', hasta);
+    return this.http.get<InformeEstado>(`${this.base}/api/reportes/${idGranja}/informe`, {
+      params,
+    });
+  }
+
+  exportarInformeCsv(
+    idGranja: string,
+    seccion: SeccionInformeCsv,
+    desde?: string,
+    hasta?: string,
+  ): Observable<Blob> {
+    let params = new HttpParams().set('seccion', seccion);
+    if (desde) params = params.set('desde', desde);
+    if (hasta) params = params.set('hasta', hasta);
+    return this.http.get(`${this.base}/api/reportes/${idGranja}/informe/csv`, {
+      params,
+      responseType: 'blob',
+    });
+  }
+
+  // === Archivos (snapshots inmutables de Inventario/Compras/Fórmulas) ===
+  getArchivos(idGranja: string, tipo?: TipoModuloArchivo): Observable<ArchivoResumen[]> {
+    let params = new HttpParams();
+    if (tipo) params = params.set('tipo', tipo);
+    return this.http.get<ArchivoResumen[]>(`${this.base}/api/archivos/${idGranja}`, { params });
+  }
+
+  getArchivoDetalle(idGranja: string, idArchivo: number): Observable<ArchivoDetalle> {
+    return this.http.get<ArchivoDetalle>(`${this.base}/api/archivos/${idGranja}/${idArchivo}`);
+  }
+
+  crearArchivo(idGranja: string, request: ArchivoCrearRequest): Observable<ArchivoResumen> {
+    return this.http.post<ArchivoResumen>(`${this.base}/api/archivos/${idGranja}`, request);
   }
 
   // === Fabricaciones ===
