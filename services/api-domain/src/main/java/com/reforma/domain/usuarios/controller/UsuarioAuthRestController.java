@@ -7,12 +7,15 @@ import com.reforma.domain.usuarios.dto.AuthResponse;
 import com.reforma.domain.usuarios.dto.ConfirmarResetRequest;
 import com.reforma.domain.usuarios.dto.LoginRequest;
 import com.reforma.domain.usuarios.dto.PerfilResponse;
+import com.reforma.domain.usuarios.dto.PreferenciasUiRequest;
+import com.reforma.domain.usuarios.dto.PreferenciasUiResponse;
 import com.reforma.domain.usuarios.dto.RegistroRequest;
 import com.reforma.domain.usuarios.dto.ReenviarVerificacionRequest;
 import com.reforma.domain.usuarios.dto.SolicitarResetRequest;
 import com.reforma.domain.usuarios.dto.VerificarEmailRequest;
 import com.reforma.domain.usuarios.service.CredencialesUsuarioService;
 import com.reforma.domain.usuarios.service.PerfilService;
+import com.reforma.domain.usuarios.service.PreferenciasUiService;
 import com.reforma.domain.usuarios.service.RecuperacionCuentaService;
 import jakarta.validation.Valid;
 import java.util.Map;
@@ -20,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -33,6 +37,7 @@ public class UsuarioAuthRestController {
     private final CredencialesUsuarioService credencialesUsuarioService;
     private final RecuperacionCuentaService recuperacionCuentaService;
     private final PerfilService perfilService;
+    private final PreferenciasUiService preferenciasUiService;
 
     @PostMapping("/registro")
     @ResponseStatus(HttpStatus.CREATED)
@@ -49,6 +54,18 @@ public class UsuarioAuthRestController {
     @GetMapping("/perfil")
     public PerfilResponse perfil() {
         return perfilService.obtenerPerfil(SecurityUtils.requireUserId());
+    }
+
+    /** Preferencias de UI (Personalización): siempre las del usuario autenticado. */
+    @GetMapping("/preferencias")
+    public PreferenciasUiResponse preferencias() {
+        return preferenciasUiService.obtener(SecurityUtils.requireUserId());
+    }
+
+    @PutMapping("/preferencias")
+    public PreferenciasUiResponse actualizarPreferencias(
+            @Valid @RequestBody PreferenciasUiRequest request) {
+        return preferenciasUiService.actualizar(SecurityUtils.requireUserId(), request);
     }
 
     @PostMapping("/verificar-email")

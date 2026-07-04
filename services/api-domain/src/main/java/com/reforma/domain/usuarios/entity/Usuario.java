@@ -21,6 +21,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "t_usuarios")
@@ -116,6 +118,14 @@ public class Usuario {
     @Builder.Default
     @Column(name = "token_version", nullable = false)
     private Integer tokenVersion = 0;
+
+    /**
+     * Preferencias de UI del usuario (fondo + intensidad de cortina) en JSONB (V014).
+     * NULL = sin personalizar; el frontend aplica el default. Ver PreferenciasUiService.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "preferencias_ui")
+    private String preferenciasUi;
 
     /**
      * Revoca las sesiones en vuelo incrementando {@link #tokenVersion}: cualquier JWT emitido con
