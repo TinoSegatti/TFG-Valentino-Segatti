@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.reforma.domain.auditoria.domain.AccionAuditoria;
 import com.reforma.domain.auditoria.dto.AuditoriaEvento;
 import com.reforma.domain.auditoria.service.AuditoriaService;
+import com.reforma.domain.auth.jwt.TokenVersionCache;
 import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
@@ -34,6 +35,7 @@ class RecuperacionCuentaServiceTest {
     @Mock private EmailNotificacionService emailNotificacionService;
     @Mock private AuditoriaService auditoriaService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private TokenVersionCache tokenVersionCache;
 
     @InjectMocks private RecuperacionCuentaService servicio;
 

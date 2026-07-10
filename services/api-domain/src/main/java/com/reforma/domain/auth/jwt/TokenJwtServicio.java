@@ -2,7 +2,6 @@ package com.reforma.domain.auth.jwt;
 
 import com.reforma.domain.config.ReformaProperties;
 import com.reforma.domain.usuarios.entity.Usuario;
-import com.reforma.domain.usuarios.repository.UsuarioRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -19,13 +18,13 @@ public class TokenJwtServicio {
 
     private final SecretKey key;
     private final int expirationHours;
-    private final UsuarioRepository usuarioRepository;
+    private final TokenVersionCache tokenVersionCache;
 
-    public TokenJwtServicio(ReformaProperties properties, UsuarioRepository usuarioRepository) {
+    public TokenJwtServicio(ReformaProperties properties, TokenVersionCache tokenVersionCache) {
         this.key = Keys.hmacShaKeyFor(
                 properties.jwt().secret().getBytes(StandardCharsets.UTF_8));
         this.expirationHours = properties.jwt().expirationHours();
-        this.usuarioRepository = usuarioRepository;
+        this.tokenVersionCache = tokenVersionCache;
     }
 
     public String generarToken(Usuario usuario) {
@@ -60,11 +59,12 @@ public class TokenJwtServicio {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        // Revocación de sesión: el "tv" del token debe coincidir con la versión vigente en BD.
+        // Revocación de sesión: el "tv" del token debe coincidir con la versión vigente
+        // (leída vía TokenVersionCache para no pagar una query a la BD por request).
         // Tokens viejos sin claim "tv" se asumen versión 0 (igual al default de la columna).
         var tvClaim = claims.get("tv", Integer.class);
         var tvToken = tvClaim == null ? 0 : tvClaim;
-        var tvActual = usuarioRepository.findTokenVersionById(claims.getSubject()).orElse(-1);
+        var tvActual = tokenVersionCache.obtener(claims.getSubject());
         if (tvActual != tvToken) {
             throw new JwtException("Sesión revocada");
         }

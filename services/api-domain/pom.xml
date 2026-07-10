@@ -21,6 +21,7 @@
     <java.version>21</java.version>
     <springdoc.version>2.8.6</springdoc.version>
     <jjwt.version>0.12.6</jjwt.version>
+    <mercadopago.version>2.5.0</mercadopago.version>
   </properties>
 
   <dependencies>
@@ -47,6 +48,12 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+    <dependency>
+      <!-- Caches in-memory (token_version por request, idempotencia de checkout, rate limiting).
+           Versión gestionada por el BOM de Spring Boot. -->
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
     </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
@@ -86,6 +93,12 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-crypto</artifactId>
+    </dependency>
+    <!-- Pasarela de pagos (RD-P13): PreapprovalClient/PaymentClient para el modo mp. -->
+    <dependency>
+      <groupId>com.mercadopago</groupId>
+      <artifactId>sdk-java</artifactId>
+      <version>${mercadopago.version}</version>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>

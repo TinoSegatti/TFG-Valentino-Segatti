@@ -3,6 +3,7 @@ package com.reforma.domain.usuarios.service;
 import com.reforma.domain.auditoria.domain.AccionAuditoria;
 import com.reforma.domain.auditoria.dto.AuditoriaEvento;
 import com.reforma.domain.auditoria.service.AuditoriaService;
+import com.reforma.domain.auth.jwt.TokenVersionCache;
 import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
@@ -33,6 +34,7 @@ public class RecuperacionCuentaService {
     private final EmailNotificacionService emailNotificacionService;
     private final AuditoriaService auditoriaService;
     private final PasswordEncoder passwordEncoder;
+    private final TokenVersionCache tokenVersionCache;
 
     @Transactional
     public void verificarEmail(String tokenPlano) {
@@ -75,6 +77,7 @@ public class RecuperacionCuentaService {
         usuario.setEmailVerificado(true);
         // Un reset de contraseña invalida cualquier sesión abierta con la clave anterior.
         usuario.revocarSesiones();
+        tokenVersionCache.invalidar(usuario.getId());
         auditar(usuario, AccionAuditoria.RESET_PASSWORD, "Contraseña restablecida");
     }
 

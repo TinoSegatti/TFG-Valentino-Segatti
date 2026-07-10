@@ -31,7 +31,8 @@ class TokenJwtServicioTest {
                 new ReformaProperties.Jwt(SECRET, 24),
                 new ReformaProperties.Ml("http://localhost:8081", SECRET),
                 "http://localhost:4200");
-        return new TokenJwtServicio(props, usuarioRepository);
+        // Cache real (TTL corto) sobre el repo mockeado: cada test arranca con cache vacío.
+        return new TokenJwtServicio(props, new TokenVersionCache(usuarioRepository, 60));
     }
 
     private static Usuario owner(int tokenVersion) {

@@ -14,6 +14,15 @@ spring:
           auth: true
           starttls:
             enable: true
+  # Pool de conexiones (HikariCP). El máximo debe ser < max_connections de Postgres (100)
+  # dejando margen para api-ml y psql. Timeout corto: mejor un 500 rápido que una cola
+  # de threads colgados esperando conexión cuando la BD está saturada.
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:15}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:5000}
+      max-lifetime: 1800000
   jpa:
     open-in-view: false
     hibernate:
@@ -31,6 +40,12 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
+  # Concurrencia HTTP acotada al pool de BD: con 15 conexiones no tiene sentido aceptar
+  # 200 requests simultáneas (default de Tomcat); el excedente espera en accept-count.
+  tomcat:
+    threads:
+      max: ${HTTP_THREADS_MAX:100}
+    accept-count: 100
 
 springdoc:
   api-docs:
@@ -48,6 +63,15 @@ reforma:
   jwt:
     secret: ${JWT_SECRET:dev_jwt_secret_minimo_64_caracteres_para_desarrollo_local_reforma_2026}
     expiration-hours: 24
+  auth:
+    # Cache in-memory del token_version (revocación de sesiones): evita 1 query a la BD por
+    # request autenticada. Una revocación tarda como máximo este TTL en propagarse a un
+    # nodo que ya tenía el valor cacheado (la invalidación local es inmediata).
+    token-version-cache-segundos: ${TOKEN_VERSION_CACHE_S:60}
+  ratelimit:
+    # Límite de intentos por IP/minuto en endpoints sensibles (login, registro, reset,
+    # checkout). Ver RateLimitFilter. Apagable para pruebas de carga locales.
+    habilitado: ${RATELIMIT_HABILITADO:true}
   ml:
     base-url: ${ML_BASE_URL:http://localhost:8081}
     secret: ${JWT_ML_SECRET:dev_ml_jwt_secret_minimo_64_caracteres_compartido_domain_ml}
@@ -64,3 +88,31 @@ reforma:
     purga-cron: ${DEMO_PURGA_CRON:0 0 3 * * *}
     # Emails nunca purgados (la cuenta demo hardcodeada), separados por coma.
     emails-exentos: ${DEMO_EMAILS_EXENTOS:demo@reforma.local}
+  # Módulo Suscripciones y Pagos (docs/PLAN_PAGOS_SUSCRIPCIONES.md).
+  # mode "simulado" (default): pasarela propia sin credenciales, para dev/demo offline.
+  # mode "mp": Mercado Pago real — exige MP_ACCESS_TOKEN/MP_WEBHOOK_SECRET (sin default
+  # funcional a propósito: jamás un token en el repo; la app falla al bootear si faltan).
+  pagos:
+    mode: ${PAGOS_MODE:simulado}
+    gracia-dias: ${PAGOS_GRACIA_DIAS:7}
+    # Ventana de idempotencia del checkout: reintentos del mismo usuario para el mismo
+    # (plan, período) dentro de la ventana devuelven la MISMA URL de pago en lugar de
+    # crear otro preapproval en MP (doble clic, doble pestaña, retry de red).
+    checkout-ventana-segundos: ${PAGOS_CHECKOUT_VENTANA_S:120}
+    # Job diario de vencimientos (RD-P8): 04:30, después de la purga DEMO de las 03:00.
+    vencimientos-cron: ${PAGOS_VENC_CRON:0 30 4 * * *}
+    vencimientos-habilitado: ${PAGOS_VENC_HABILITADO:true}
+    # Precios de lista en ARS (RD-P12): configurables por env ante devaluación, sin release.
+    # El precio al contratar se snapshotea en t_suscripcion.precio_ars.
+    precios:
+      starter-mensual: ${PRECIO_STARTER_MES:50750}
+      business-mensual: ${PRECIO_BUSINESS_MES:143550}
+      enterprise-mensual: ${PRECIO_ENTERPRISE_MES:332050}
+      factor-anual: 10   # anual = mensual x 10 (2 meses gratis)
+    mp:
+      access-token: ${MP_ACCESS_TOKEN:}
+      webhook-secret: ${MP_WEBHOOK_SECRET:}
+      back-url-base: ${MP_BACK_URL_BASE:http://localhost:4200}
+      # Solo sandbox: MP exige que el payer_email del preapproval sea el COMPRADOR de
+      # prueba (no el email real del dueño). Vacío en producción = email del dueño.
+      payer-email-override: ${MP_PAYER_EMAIL:}
