@@ -17,6 +17,195 @@ Formato sugerido por entrada:
 
 ## Entradas
 
+### 2026-07-09 — Robustez pre-commit: pooling, caches, idempotencia y rate limiting
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** auditoría de concurrencia/carga previa al commit del backlog y endurecimiento
+  en 4 frentes (todo en memoria con Caffeine — instancia única; si se escala a varias
+  instancias, migrar contadores/caches a Redis):
+  - **Connection pooling y threads:** HikariCP explícito (15 conexiones, `connection-timeout`
+    5 s, `max-lifetime` 30 min) y Tomcat acotado a 100 threads + `accept-count` 100 en
+    `application.yml`, todo sobreescribible por env (`DB_POOL_*`, `HTTP_THREADS_MAX`).
+  - **`TokenVersionCache`** (TTL 60 s): elimina la consulta a BD por request autenticado que
+    hacía `TokenJwtServicio.validarToken`; invalidación explícita en los 3 puntos de
+    `revocarSesiones()` (cambio de rol, desactivación de empleado, reset de contraseña),
+    con el TTL como cota del peor caso.
+  - **`CheckoutIdempotencia`** (ventana 120 s): doble clic / doble pestaña / retry del mismo
+    `(plan, período)` devuelven la MISMA URL de pago en vez de crear otro preapproval en MP;
+    `Cache.get` atómico por clave = serialización por usuario; se invalida al activarse la
+    suscripción. Cambio de intención (otro plan/período) sí crea checkout nuevo.
+  - **`RateLimitFilter`** (ventana fija 1 min por IP+path, `X-Forwarded-For` consciente,
+    desactivable con `RATELIMIT_HABILITADO=false`): login 10/min, registro 5/min,
+    solicitar-reset y reenviar-verificacion 3/min (protegen SMTP), checkout 10/min.
+    Responde 429 con el JSON de `ApiError`.
+  - **Fix cosmético `t_pago`:** la descripción del pago ahora sale del `external_reference`
+    del propio pago (plan/período del checkout que lo generó) y no del plan local, que en un
+    upgrade queda viejo si el webhook `payment` llega antes que el `authorized`.
+- **Verificación:** suite en contenedor Maven descartable: **341 tests, 0 fallos** (+8:
+  2 idempotencia de checkout, 5 rate limit, 1 descripción de pago). Lo ya existente que la
+  auditoría confirmó sano: guards de frontend (`procesando()`/`loading()`), webhook de pagos
+  idempotente (UNIQUE `mp_payment_id`), bloqueo optimista de inventario (`@Version` → 409).
+- **Archivos principales:** `pom.xml` (caffeine), `application.yml`,
+  `auth/jwt/TokenVersionCache.java`, `suscripciones/service/CheckoutIdempotencia.java`,
+  `config/RateLimitFilter.java`, `suscripciones/service/PagoWebhookService.java`, tests.
+- **Pendiente:** commits lógicos del working tree (con OK del usuario), Etapa 5 de pagos.
+
+### 2026-07-09 — Suscripciones y pagos: gate de la Etapa 4 COMPLETO (sandbox end-to-end)
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** recorrido completo del gate en el sandbox de Mercado Pago vía túnel ngrok, con
+  **entrega automática de webhooks funcionando** (detalle y obstáculos en
+  `docs/PLAN_PAGOS_SUSCRIPCIONES.md` §9, gitignored):
+  - **Alta STARTER:** checkout hospedado, suscripción `authorized` en MP y ACTIVA local
+    (verificado en `t_suscripcion` + `t_usuarios.plan_suscripcion`).
+  - **Upgrade BUSINESS:** activación por webhook y **cancelación automática del
+    preapproval STARTER viejo en MP (RD-P4 confirmado)**; primer pago real registrado en
+    `t_pago` con `mp_payment_id`, APROBADO.
+  - **Cancelación:** desde `/suscripcion` → preapproval `paused` en MP, local CANCELADA
+    con `plan_pendiente=DEMO` y el plan pago vigente hasta el fin del ciclo cobrado.
+  - Entrega automática: la config de Webhooks de la app sandbox va en la pestaña
+    "Modo productivo" del panel; desde entonces MP entregó todos los eventos solo, con
+    firma válida y duplicados procesados idempotentes.
+- **Sin cambios de código en esta sesión** (solo configuración externa y verificación).
+- **Pendiente:** detalle cosmético (descripción del pago cuando el evento `payment`
+  llega antes que el `authorized`); limpieza post-gate (`FRONTEND_URL` a localhost,
+  fila PENDIENTE_PAGO huérfana); **Etapa 5**: guía de pruebas manuales, security-review,
+  commits lógicos.
+
+### 2026-07-07 — Suscripciones y pagos: Etapa 4 (integración real con Mercado Pago, sandbox)
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** implementación completa del modo `mp` de la pasarela (detalle en
+  `docs/PLAN_PAGOS_SUSCRIPCIONES.md` §9, gitignored):
+  - SDK oficial `com.mercadopago:sdk-java` 2.5.0.
+  - `PasarelaMercadoPagoService` (activa con `PAGOS_MODE=mp`, fail-fast si faltan
+    credenciales): checkout por suscripción (preapproval `pending`, tarjeta solo en el
+    checkout hospedado de MP), pausa/reanudación/cancelación definitiva y actualización
+    de monto recurrente; errores de MP → 502 amigable sin filtrar el token.
+  - Webhook `POST /api/pagos/webhook` (ruta pública autenticada por firma HMAC-SHA256
+    de MP): valida `x-signature`, re-consulta a MP sin confiar en el payload, activa
+    suscripciones (`subscription_preapproval`), replica cancelaciones, y mantiene el
+    historial de `Pago` idempotente por `mp_payment_id` con extensión de ciclo y aviso
+    por email si el cobro sale rechazado.
+  - `SuscripcionService.activarDesdePasarela(...)` + `findByMpPreapprovalId`/
+    `findByMpPaymentId`; en modo MP el pago local no se inventa: lo escriben los eventos.
+- **Validación:** suite Docker verde (333 tests, 29 nuevos). Desplegado en modo `mp` y
+  smoke test manual del webhook firmando con el secret real: 200 con firma válida,
+  401 con firma inválida. **Validado contra MP real:** la prueba de notificación del
+  panel devuelve 200 a través del túnel ngrok. Dos fixes salieron de esa prueba en vivo:
+  MP responde 400 (no 404) al re-consultar un id ficticio (se ignora con 200), y el `ts`
+  de `x-signature` viene en segundos epoch (el validador asumía milisegundos y rechazaba
+  toda firma real con 401; ahora acepta ambos por magnitud).
+- **Archivos principales:** `suscripciones/pasarela/PasarelaMercadoPagoService.java`,
+  `suscripciones/pasarela/MpWebhookFirmaValidator.java`,
+  `suscripciones/service/PagoWebhookService.java`,
+  `suscripciones/controller/PagoWebhookRestController.java`, `config/SecurityConfig.java`,
+  `pom.xml`, `application.yml`, `docker-compose.yml`.
+- **Pendiente:** gate de la etapa — recorrido sandbox end-to-end (alta STARTER, upgrade
+  BUSINESS, cancelación) con el túnel ngrok relanzado; luego Etapa 5 (guía de pruebas,
+  security-review, commits).
+
+### 2026-07-06 — Suscripciones y pagos: Etapa 3 (frontend contra el modo simulado)
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** frontend Angular completo del módulo de pagos (bitácora en `docs/PLAN_PAGOS_SUSCRIPCIONES.md` §9).
+  - **Modelos y API:** `data/models/suscripcion.model.ts` + 8 métodos en `reforma-api.service.ts`
+    (catálogo, suscripción, pagos, impacto, checkout, confirmación simulada, cancelar, reactivar).
+  - **`/planes` (público):** cards de los 4 planes con datos reales del catálogo, toggle
+    Mensual/Anual ("2 meses gratis"), "Tu plan actual" resaltado, BUSINESS "Recomendado".
+    Upgrade → checkout y redirección a `urlPago`; downgrade → modal de impacto (RD-P6.c):
+    bloqueantes (empleados) deshabilitan el CTA con link "Gestionar equipo", advertencias por
+    granja permiten confirmar. Sin login: CTA "Crear cuenta"; empleados: aviso de solo lectura.
+  - **`/planes/checkout-simulado`:** pantalla de pago de la pasarela simulada (resumen del plan
+    con precio del catálogo, "Aprobar pago"/"Rechazar pago") — la URL que emite el backend en
+    modo `simulado`.
+  - **`/planes/retorno`:** verificación post-checkout con polling corto de la suscripción hasta
+    verla ACTIVA (compatible con la confirmación asíncrona por webhook de la Etapa 4) y refresco
+    del perfil (RD-P11); pantallas de rechazo y de "pago en proceso".
+  - **`/suscripcion` (OWNER):** estado con chips, ciclo y último cobro, banner de cambio
+    programado/cancelación con "Mantener mi plan" (reactivar), historial de pagos paginado y
+    cancelación con modal de consecuencias (RD-P7: fin de ciclo → DEMO → purga a los 60 días).
+    Empleados ven "La suscripción la gestiona el dueño".
+  - **Enlaces:** item "Suscripción" en el navbar (solo dueños), "Gestionar" junto al plan en
+    `/perfil`, "Ver planes y precios" en la home.
+  - **Validación (gate cumplido):** `docker compose build web` verde (gotcha Angular: el alias
+    `as` solo se permite en el `@if` primario, no en `@else if`) + smoke E2E en navegador
+    (Playwright headless): login demo → planes → upgrade ENTERPRISE por checkout simulado →
+    retorno ACTIVA → suscripción/historial → cancelar + revertir → downgrade STARTER con modal
+    de impacto → programado + revertido. 8 capturas verificadas, 0 errores de consola; cuenta
+    demo restaurada a BUSINESS ACTIVA.
+- **Archivos principales:** `apps/web/src/app/data/models/suscripcion.model.ts`,
+  `reforma-api.service.ts`, `features/planes/**` (3 componentes), `features/suscripcion/**`,
+  `app.routes.ts`, `shared/account-nav.component.ts`, `features/perfil/perfil.component.ts`,
+  `features/home/home.component.ts`.
+- **Pendiente:** Etapa 4 (Mercado Pago real: impl `mp`, webhook HMAC, sandbox) o cierre Etapa 5
+  (guía de pruebas manuales, security-review, commits); decisión S1–S7; commitear cuando el
+  usuario lo pida.
+
+### 2026-07-06 — Suscripciones y pagos: Etapa 2 (máquina de estados con pasarela simulada, backend)
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** segunda etapa del módulo de pagos (bitácora completa en `docs/PLAN_PAGOS_SUSCRIPCIONES.md`
+  §9, gitignored).
+  - **Pasarela abstraída:** `PasarelaPagosService` + `PasarelaSimuladaService` (mode `simulado`
+    default: checkout sin credenciales que apunta a `/planes/checkout-simulado`; renovaciones
+    siempre aprobadas). La impl Mercado Pago real queda para Etapa 4.
+  - **Máquina de estados** en `SuscripcionService`: `checkout` (upgrade/primera contratación
+    inmediatos con cobro — sin tocar jamás la fila ACTIVA/CANCELADA vigente; downgrade sobre
+    ACTIVA queda programado en `plan_pendiente` a fin de ciclo, sin cobro), `confirmarSimulado`
+    (cierre del pago simulado, 404 en modo real; re-valida todo), `cancelar` (nunca se bloquea;
+    plan vigente hasta fin de ciclo y caída a DEMO programada) y `reactivar` ("mantener mi plan":
+    des-programa downgrade o revierte cancelación).
+  - **Política de empleados (RD-P6.b) completa:** contratar un plan exige equipo dentro del límite
+    destino (409 estructurado con `excedente` para el modal "Gestionar equipo"); el alta y la
+    reactivación de empleados validan contra `min(plan actual, plan pendiente)`; el job re-verifica
+    al aplicar y pospone el downgrade un ciclo (con aviso por email) si se rompió; al caer a DEMO
+    se desactivan los empleados excedentes, los más recientes primero (con auditoría y revocación
+    de sesiones). Preview para el frontend: `GET /api/suscripcion/cambio-impacto` (bloqueantes +
+    advertencias por granja).
+  - **Job de vencimientos (RD-P8):** diario 04:30 (tras la purga DEMO de las 03:00), cada cuenta
+    en su propia transacción re-evaluando estado: expira canceladas al fin de ciclo (con
+    `fecha_inicio_demo` para la ventana de purga, RD-P7), expira por gracia agotada (7 días tras
+    cobro rechazado), aplica downgrades programados (precio de lista) y renueva ciclos vencidos
+    cobrando el precio snapshot (el ciclo nuevo arranca donde terminó el anterior).
+  - **Fix purga DEMO:** la retención cuenta desde `COALESCE(fecha_inicio_demo, fecha_registro)` y
+    la purga borra `t_pago` → `t_suscripcion` antes que las cuentas.
+  - **Endpoints nuevos (OWNER):** `POST /api/suscripcion/checkout|confirmar-simulado|cancelar|reactivar`
+    y `GET /api/suscripcion/cambio-impacto`.
+  - **Validación:** suite **304/304 verde** (+46 tests: transiciones del job, checkout/confirmación/
+    cancelar/reactivar, impacto, controller, empleados vs. plan pendiente) en contenedor Maven;
+    smoke en vivo del flujo completo por API en modo simulado (alta STARTER → upgrade BUSINESS →
+    downgrade programado → reactivar → rechazo sin efectos colaterales → cancelar → reactivar,
+    con el trail de auditoría completo). **Gate de Etapa 2 cumplido.** Nota: la cuenta demo quedó
+    con suscripción ACTIVA BUSINESS gestionada (coherente con su plan; `make reset-db` la revierte).
+- **Archivos principales:** `domain/suscripciones/**` (pasarela, servicios de transición/impacto,
+  controller y tests), `EmpleadoService.java` (+ test), `GlobalExceptionHandler.java`,
+  `EmailNotificacionService` (3 impls), `UsuarioRepository.java`, `LimpiezaCuentasDemoService.java`,
+  `PurgaCuentaDemoRepository.java`, `application.yml`.
+- **Pendiente:** Etapa 3 (frontend planes/suscripción/checkout simulado); decisión S1–S7 de límites;
+  posible veto a la desactivación automática RD-P6.b.4; commitear cuando el usuario lo pida.
+
+### 2026-07-05 — Suscripciones y pagos: Etapa 1 (dominio y catálogo, backend)
+- **Autor/agente:** Claude Code (Fable 5)
+- **Qué:** primera etapa del módulo de pagos (plan detallado en `docs/PLAN_PAGOS_SUSCRIPCIONES.md`,
+  gitignored — bitácora completa en su sección 9).
+  - **V015:** `t_suscripcion` (1:1 con dueño, estado de la suscripción contratada; sin fila = DEMO
+    implícito) y `t_pago` (historial de cobros), más `t_usuarios.fecha_inicio_demo` (RD-P7, para
+    que la purga DEMO cuente desde la última caída a DEMO y no desde el registro) con backfill.
+  - **Backend nuevo** `domain/suscripciones`: enums (`EstadoSuscripcion`, `PeriodoFacturacion`,
+    `EstadoPago`), entidades `Suscripcion`/`Pago`, repos, DTOs récord, `PrecioPlanService`
+    (precios ARS desde config `reforma.pagos.precios.*`, anual = mensual × 10) y
+    `SuscripcionService`. Endpoints: `GET /api/suscripcion/planes` (público, catálogo con límites
+    desde `PlanService`, `null` = ilimitado), `GET /api/suscripcion` y `GET /api/suscripcion/pagos`
+    (OWNER). 10 acciones de auditoría reservadas para Etapa 2.
+  - **Config/seguridad:** bloque `reforma.pagos` (mode `simulado` default; credenciales MP con
+    default vacío — nunca en el repo público), passthrough en `docker-compose.yml`, `.env.example`
+    documentado. El registro de dueños setea `fecha_inicio_demo`.
+  - **Validación:** suite 258/258 verde (15 tests nuevos) en contenedor Maven (`Dockerfile.test`);
+    V015 aplicada en vivo; smoke OK de los 3 endpoints (catálogo público + demo BUSINESS con
+    respuesta implícita y pagos vacíos).
+- **Archivos principales:** `db/migration/V015__suscripciones_pagos.sql`,
+  `domain/suscripciones/**` (código y tests), `AccionAuditoria.java`, `Usuario.java`,
+  `CredencialesUsuarioService.java`, `application.yml`, `docker-compose.yml`, `.env.example`.
+- **Pendiente:** Etapa 2 (máquina de estados + gateway simulado + política RD-P6.b de downgrade +
+  fix de purga con `COALESCE(fecha_inicio_demo, fecha_registro)`); decisión S1–S7 de límites;
+  commitear el trabajo cuando el usuario lo pida.
+
 ### 2026-07-03 — Módulos finales: Archivos (activación), Informe de Estado (RF-REP) y Personalización
 - **Autor/agente:** Claude Code (Fable 5)
 - **Qué:** cierre de los 3 módulos de `docs/PLAN_MODULOS_FINALES.md`.
