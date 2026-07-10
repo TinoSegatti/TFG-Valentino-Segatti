@@ -26,9 +26,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario, String> {
     java.util.List<Usuario> findByUsuarioDuenoIdOrderByFechaVinculacionDesc(String idDueno);
 
     /**
-     * Cuentas dueñas (no empleados) de un plan dado registradas antes del corte.
-     * Usado por la limpieza de cuentas DEMO vencidas (retención de prueba).
+     * Cuentas dueñas (no empleados) DEMO cuya ventana de retención venció (RD-P7): la ventana
+     * arranca en {@code fecha_inicio_demo} (se resetea cuando una suscripción cae a DEMO) o en
+     * {@code fecha_registro} para las filas heredadas sin valor. Usado por la purga DEMO.
      */
-    List<Usuario> findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-            PlanSuscripcion plan, Instant corte);
+    @Query("select u from Usuario u where u.planSuscripcion = :plan"
+            + " and u.esUsuarioEmpleado = false"
+            + " and coalesce(u.fechaInicioDemo, u.fechaRegistro) < :corte")
+    List<Usuario> findCuentasDemoVencidas(
+            @Param("plan") PlanSuscripcion plan, @Param("corte") Instant corte);
 }

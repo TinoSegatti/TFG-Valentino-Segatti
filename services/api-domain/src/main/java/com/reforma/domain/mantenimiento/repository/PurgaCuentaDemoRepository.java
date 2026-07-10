@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       cascada de {@code t_materia_prima} → se elimina primero.</li>
  *   <li>{@code t_auditoria.id_usuario} (NO ACTION) bloquearía el borrado de las cuentas → se
  *       elimina antes que los usuarios.</li>
+ *   <li>{@code t_suscripcion.id_usuario} y {@code t_pago.id_suscripcion} (V015, sin cascada a
+ *       propósito) bloquearían el borrado del dueño → se eliminan pagos y suscripción antes.</li>
  * </ul>
  * Y las cuentas de empleado se borran antes que la del dueño porque lo referencian vía
  * {@code id_usuario_dueno}, y después de borrar las granjas para que ya no queden compras /
@@ -55,12 +57,24 @@ public class PurgaCuentaDemoRepository {
                 .setParameter("owner", idDueno)
                 .executeUpdate();
 
-        // 4. Cuentas de empleado vinculadas. Cascada → suscripciones/pagos, token_seguridad.
+        // 4. Pagos y suscripción del dueño (V015, FK hacia t_usuarios SIN cascada a propósito):
+        //    t_pago referencia t_suscripcion, así que cae primero. Los empleados no tienen
+        //    suscripción propia (t_suscripcion es 1:1 con el dueño).
+        em.createNativeQuery(
+                        "DELETE FROM t_pago WHERE id_suscripcion IN ("
+                                + "SELECT id FROM t_suscripcion WHERE id_usuario = :owner)")
+                .setParameter("owner", idDueno)
+                .executeUpdate();
+        em.createNativeQuery("DELETE FROM t_suscripcion WHERE id_usuario = :owner")
+                .setParameter("owner", idDueno)
+                .executeUpdate();
+
+        // 5. Cuentas de empleado vinculadas. Cascada → token_seguridad.
         em.createNativeQuery("DELETE FROM t_usuarios WHERE id_usuario_dueno = :owner")
                 .setParameter("owner", idDueno)
                 .executeUpdate();
 
-        // 5. La cuenta del dueño. Cascada → suscripciones/pagos, token_seguridad.
+        // 6. La cuenta del dueño. Cascada → token_seguridad.
         em.createNativeQuery("DELETE FROM t_usuarios WHERE id = :owner")
                 .setParameter("owner", idDueno)
                 .executeUpdate();

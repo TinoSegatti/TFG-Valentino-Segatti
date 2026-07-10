@@ -3,13 +3,14 @@ package com.reforma.domain.empleados.service;
 import com.reforma.domain.auditoria.domain.AccionAuditoria;
 import com.reforma.domain.auditoria.dto.AuditoriaEvento;
 import com.reforma.domain.auditoria.service.AuditoriaService;
+import com.reforma.domain.auth.jwt.TokenVersionCache;
 import com.reforma.domain.common.domain.RolEmpleado;
 import com.reforma.domain.common.domain.TipoUsuario;
 import com.reforma.domain.common.util.IdGenerator;
 import com.reforma.domain.empleados.dto.AceptarInvitacionRequest;
 import com.reforma.domain.empleados.dto.EmpleadoResponse;
 import com.reforma.domain.empleados.dto.InvitarEmpleadoRequest;
-import com.reforma.domain.suscripciones.service.PlanService;
+import com.reforma.domain.suscripciones.service.SuscripcionService;
 import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
@@ -46,11 +47,12 @@ public class EmpleadoService {
     private static final Duration VIGENCIA_INVITACION = Duration.ofHours(72);
 
     private final UsuarioRepository usuarioRepository;
-    private final PlanService planService;
+    private final SuscripcionService suscripcionService;
     private final TokenSeguridadService tokenSeguridadService;
     private final EmailNotificacionService emailNotificacionService;
     private final AuditoriaService auditoriaService;
     private final PasswordEncoder passwordEncoder;
+    private final TokenVersionCache tokenVersionCache;
 
     // ---------------------------------------------------------------- invitar
 
@@ -72,12 +74,7 @@ public class EmpleadoService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "El email ya está registrado");
         }
 
-        var plan = planService.obtenerPlanEfectivo(dueno.getId());
-        var limite = planService.limiteEmpleados(plan);
-        var actuales = usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(dueno.getId());
-        if (actuales >= limite) {
-            throw prohibido("Límite de empleados alcanzado para el plan " + plan.name());
-        }
+        validarCupoEmpleados(dueno.getId());
 
         var empleado = Usuario.builder()
                 .id(IdGenerator.newId())
@@ -150,6 +147,7 @@ public class EmpleadoService {
         empleado.setRolEmpleado(nuevoRol);
         // El token en vuelo lleva el rol anterior en sus authorities; revocarlo fuerza re-login.
         empleado.revocarSesiones();
+        tokenVersionCache.invalidar(empleado.getId());
         auditar(actor.getId(), empleado.getId(), AccionAuditoria.CAMBIO_ROL_EMPLEADO, "Cambio de rol de empleado",
                 Map.of("rolAnterior", String.valueOf(rolAnterior), "rolNuevo", nuevoRol.name()));
         return EmpleadoResponse.from(empleado);
@@ -166,10 +164,15 @@ public class EmpleadoService {
         var empleado = cargarEmpleadoDelDueno(idEmpleado, dueno.getId());
         autorizarAccion(actor, empleado, null);
 
+        // Reactivar consume cupo igual que un alta (RD-P6.b.2): validar contra el límite operativo.
+        if (activo && !Boolean.TRUE.equals(empleado.getActivoComoEmpleado())) {
+            validarCupoEmpleados(dueno.getId());
+        }
         empleado.setActivoComoEmpleado(activo);
         // Al desactivar, cortar de inmediato las sesiones en vuelo (el login ya lo rechaza).
         if (!activo) {
             empleado.revocarSesiones();
+            tokenVersionCache.invalidar(empleado.getId());
         }
         auditar(actor.getId(), empleado.getId(), AccionAuditoria.DESACTIVAR_EMPLEADO,
                 activo ? "Reactivación de empleado" : "Desactivación de empleado",
@@ -223,6 +226,22 @@ public class EmpleadoService {
             }
         }
         // OWNER: sin restricciones adicionales (no figura en la lista de empleados de su propio tenant).
+    }
+
+    /**
+     * Plan-gating del equipo contra el límite OPERATIVO (RD-P6.b.2): mientras haya un downgrade
+     * programado rige el menor entre el plan actual y el pendiente, para que la precondición de
+     * empleados no pueda romperse entre programar el cambio y que el job lo aplique.
+     */
+    private void validarCupoEmpleados(String idDueno) {
+        var limite = suscripcionService.limiteEmpleadosOperativo(idDueno);
+        var actuales = usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(idDueno);
+        if (actuales >= limite.limite()) {
+            throw prohibido(limite.porCambioProgramado()
+                    ? "Límite de empleados alcanzado: tenés un cambio a " + limite.planQueLimita().name()
+                            + " programado (límite: " + limite.limite() + ")"
+                    : "Límite de empleados alcanzado para el plan " + limite.planQueLimita().name());
+        }
     }
 
     private static boolean esJefe(Usuario u) {

@@ -24,5 +24,16 @@ public enum AccionAuditoria {
     // Módulo Archivos — snapshot inmutable creado (t_archivo, V013)
     ARCHIVO_CREADO,
     // Módulo Reportes — informe de estado generado (RF-REP)
-    INFORME_GENERADO
+    INFORME_GENERADO,
+    // Módulo Suscripciones y Pagos (V015; reservadas hasta la Etapa 2 de PLAN_PAGOS_SUSCRIPCIONES)
+    CHECKOUT_INICIADO,
+    SUSCRIPCION_ACTIVADA,
+    PLAN_CAMBIADO,
+    DOWNGRADE_PROGRAMADO,
+    DOWNGRADE_POSPUESTO,
+    DOWNGRADE_APLICADO,
+    SUSCRIPCION_CANCELADA,
+    SUSCRIPCION_REACTIVADA,
+    SUSCRIPCION_EXPIRADA,
+    PAGO_REGISTRADO
 }

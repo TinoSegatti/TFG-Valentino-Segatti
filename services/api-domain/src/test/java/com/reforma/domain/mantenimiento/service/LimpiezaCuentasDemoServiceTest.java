@@ -46,8 +46,7 @@ class LimpiezaCuentasDemoServiceTest {
 
     @Test
     void purgaVencidasYOmiteExentas() {
-        when(usuarioRepository.findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-                        eq(PlanSuscripcion.DEMO), any()))
+        when(usuarioRepository.findCuentasDemoVencidas(eq(PlanSuscripcion.DEMO), any()))
                 .thenReturn(List.of(demo("u1", "viejo@prueba.local"), demo("u2", "Autor@Reforma.com")));
 
         // El exento se compara sin distinción de mayúsculas/minúsculas.
@@ -65,8 +64,7 @@ class LimpiezaCuentasDemoServiceTest {
 
     @Test
     void usaElCorteSegunLaRetencion() {
-        when(usuarioRepository.findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-                        eq(PlanSuscripcion.DEMO), any()))
+        when(usuarioRepository.findCuentasDemoVencidas(eq(PlanSuscripcion.DEMO), any()))
                 .thenReturn(List.of());
 
         Instant antes = Instant.now().minus(60, ChronoUnit.DAYS);
@@ -75,15 +73,13 @@ class LimpiezaCuentasDemoServiceTest {
 
         ArgumentCaptor<Instant> corte = ArgumentCaptor.forClass(Instant.class);
         verify(usuarioRepository)
-                .findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-                        eq(PlanSuscripcion.DEMO), corte.capture());
+                .findCuentasDemoVencidas(eq(PlanSuscripcion.DEMO), corte.capture());
         assertThat(corte.getValue()).isBetween(antes, despues);
     }
 
     @Test
     void unFalloAisladoNoDetieneAlResto() {
-        when(usuarioRepository.findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-                        eq(PlanSuscripcion.DEMO), any()))
+        when(usuarioRepository.findCuentasDemoVencidas(eq(PlanSuscripcion.DEMO), any()))
                 .thenReturn(List.of(demo("u1", "a@prueba.local"), demo("u2", "b@prueba.local")));
         doThrow(new RuntimeException("FK boom")).when(purgaRepository).purgarTenant("u1");
 

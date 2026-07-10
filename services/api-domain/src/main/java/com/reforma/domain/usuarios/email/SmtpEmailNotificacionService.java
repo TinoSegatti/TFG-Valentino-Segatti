@@ -69,6 +69,11 @@ public class SmtpEmailNotificacionService implements EmailNotificacionService {
                         + "El enlace vence en 72 horas.");
     }
 
+    @Override
+    public void enviarAvisoSuscripcion(Usuario dueno, String asunto, String cuerpo) {
+        enviar(dueno.getEmail(), asunto, "Hola " + dueno.getNombreUsuario() + ",\n\n" + cuerpo);
+    }
+
     private void enviar(String destinatario, String asunto, String cuerpo) {
         var mensaje = new SimpleMailMessage();
         mensaje.setFrom(from);

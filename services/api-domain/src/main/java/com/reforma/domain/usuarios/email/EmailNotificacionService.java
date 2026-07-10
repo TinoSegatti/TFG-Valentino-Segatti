@@ -19,4 +19,11 @@ public interface EmailNotificacionService {
      * token de un solo uso (tipo {@code INVITACION_EMPLEADO}) que viaja en el enlace.
      */
     void enviarInvitacionEmpleado(Usuario dueno, Usuario empleado, String tokenPlano);
+
+    /**
+     * Aviso del ciclo de vida de la suscripción (módulo Pagos): renovación fallida,
+     * downgrade pospuesto, caída a DEMO, etc. Texto plano ya armado por el llamador;
+     * nunca debe incluir datos de tarjetas ni tokens de la pasarela.
+     */
+    void enviarAvisoSuscripcion(Usuario dueno, String asunto, String cuerpo);
 }

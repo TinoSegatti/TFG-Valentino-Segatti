@@ -42,4 +42,9 @@ public class LogEmailNotificacionService implements EmailNotificacionService {
                 empleado.getRolEmpleado(),
                 enlace);
     }
+
+    @Override
+    public void enviarAvisoSuscripcion(Usuario dueno, String asunto, String cuerpo) {
+        log.info("[EMAIL:SUSCRIPCION] para {} -> {} | {}", dueno.getEmail(), asunto, cuerpo);
+    }
 }

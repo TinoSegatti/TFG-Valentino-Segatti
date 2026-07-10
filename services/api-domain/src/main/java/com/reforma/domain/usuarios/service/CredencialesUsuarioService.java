@@ -58,6 +58,8 @@ public class CredencialesUsuarioService {
                 .activo(true)
                 .emailVerificado(false)
                 .fechaRegistro(Instant.now())
+                // Nace DEMO: arranca su ventana de retención (V015, RD-P7 del módulo de pagos).
+                .fechaInicioDemo(Instant.now())
                 .esUsuarioEmpleado(false)
                 .activoComoEmpleado(false)
                 .build();

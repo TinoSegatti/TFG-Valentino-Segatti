@@ -29,6 +29,9 @@ public class SecurityConfig {
         "/api/usuarios/confirmar-reset",
         "/api/empleados/aceptar",
         "/api/suscripcion/planes",
+        // Webhook de Mercado Pago (RD-P9): MP no manda JWT; lo autentica la firma HMAC
+        // x-signature en el controller (401 si no valida). Solo existe con mode=mp.
+        "/api/pagos/webhook",
         "/v3/api-docs/**",
         "/swagger-ui/**",
         "/swagger-ui.html",

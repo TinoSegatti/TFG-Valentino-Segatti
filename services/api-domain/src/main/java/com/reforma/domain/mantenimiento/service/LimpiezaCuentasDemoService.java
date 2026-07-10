@@ -18,10 +18,12 @@ import org.springframework.stereotype.Service;
 
 /**
  * Política de retención de cuentas de prueba: una cuenta <b>DEMO</b> se purga por completo
- * (sus granjas y datos, el historial de precios para ML, la auditoría, los tokens/links emitidos
- * y la propia cuenta del dueño y sus empleados) a los {@code reforma.demo.retencion-dias} días
- * de su registro. Así el entorno de demostración se mantiene limpio y los emails vuelven a quedar
- * libres para registrarse de nuevo.
+ * (sus granjas y datos, el historial de precios para ML, la auditoría, los tokens/links emitidos,
+ * su suscripción/pagos y la propia cuenta del dueño y sus empleados) a los
+ * {@code reforma.demo.retencion-dias} días del inicio de su ventana DEMO —
+ * {@code COALESCE(fecha_inicio_demo, fecha_registro)}: el registro para cuentas de prueba, o la
+ * caída a DEMO por cancelación/expiración de la suscripción (RD-P7). Así el entorno de
+ * demostración se mantiene limpio y los emails vuelven a quedar libres para registrarse de nuevo.
  *
  * <p>Corre como tarea programada ({@code reforma.demo.purga-cron}, por defecto a diario 03:00).
  * Cada tenant se purga en su propia transacción, de modo que un fallo aislado no detiene al resto.
@@ -60,9 +62,10 @@ public class LimpiezaCuentasDemoService {
             return;
         }
         Instant corte = Instant.now().minus(retencionDias, ChronoUnit.DAYS);
+        // La ventana cuenta desde fecha_inicio_demo (reseteada al caer a DEMO, RD-P7) o,
+        // para filas heredadas sin valor, desde fecha_registro.
         List<Usuario> candidatos = usuarioRepository
-                .findByPlanSuscripcionAndEsUsuarioEmpleadoFalseAndFechaRegistroBefore(
-                        PlanSuscripcion.DEMO, corte);
+                .findCuentasDemoVencidas(PlanSuscripcion.DEMO, corte);
         if (candidatos.isEmpty()) {
             return;
         }

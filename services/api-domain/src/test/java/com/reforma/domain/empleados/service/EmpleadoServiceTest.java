@@ -11,12 +11,13 @@ import static org.mockito.Mockito.when;
 import com.reforma.domain.auditoria.domain.AccionAuditoria;
 import com.reforma.domain.auditoria.dto.AuditoriaEvento;
 import com.reforma.domain.auditoria.service.AuditoriaService;
+import com.reforma.domain.auth.jwt.TokenVersionCache;
 import com.reforma.domain.common.domain.PlanSuscripcion;
 import com.reforma.domain.common.domain.RolEmpleado;
 import com.reforma.domain.common.domain.TipoUsuario;
 import com.reforma.domain.empleados.dto.AceptarInvitacionRequest;
 import com.reforma.domain.empleados.dto.InvitarEmpleadoRequest;
-import com.reforma.domain.suscripciones.service.PlanService;
+import com.reforma.domain.suscripciones.service.SuscripcionService;
 import com.reforma.domain.usuarios.email.EmailNotificacionService;
 import com.reforma.domain.usuarios.entity.Usuario;
 import com.reforma.domain.usuarios.repository.UsuarioRepository;
@@ -41,11 +42,12 @@ class EmpleadoServiceTest {
     private static final String ID_DUENO = "u_dueno";
 
     @Mock private UsuarioRepository usuarioRepository;
-    @Mock private PlanService planService;
+    @Mock private SuscripcionService suscripcionService;
     @Mock private TokenSeguridadService tokenSeguridadService;
     @Mock private EmailNotificacionService emailNotificacionService;
     @Mock private AuditoriaService auditoriaService;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private TokenVersionCache tokenVersionCache;
 
     @InjectMocks private EmpleadoService servicio;
 
@@ -62,8 +64,8 @@ class EmpleadoServiceTest {
                 "Nuevo@Reforma.com ", "Ana", "Pérez", RolEmpleado.EDITOR);
         when(usuarioRepository.findById(ID_DUENO)).thenReturn(Optional.of(dueno));
         when(usuarioRepository.existsByEmailIgnoreCase("nuevo@reforma.com")).thenReturn(false);
-        when(planService.obtenerPlanEfectivo(ID_DUENO)).thenReturn(PlanSuscripcion.BUSINESS);
-        when(planService.limiteEmpleados(PlanSuscripcion.BUSINESS)).thenReturn(10);
+        when(suscripcionService.limiteEmpleadosOperativo(ID_DUENO))
+                .thenReturn(new SuscripcionService.LimiteEmpleados(10, PlanSuscripcion.BUSINESS, false));
         when(usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(ID_DUENO))
                 .thenReturn(0L);
         when(tokenSeguridadService.emitir(
@@ -113,8 +115,8 @@ class EmpleadoServiceTest {
     void invitar_sobreLimite() {
         when(usuarioRepository.findById(ID_DUENO)).thenReturn(Optional.of(dueno(PlanSuscripcion.STARTER)));
         when(usuarioRepository.existsByEmailIgnoreCase("nuevo@reforma.com")).thenReturn(false);
-        when(planService.obtenerPlanEfectivo(ID_DUENO)).thenReturn(PlanSuscripcion.STARTER);
-        when(planService.limiteEmpleados(PlanSuscripcion.STARTER)).thenReturn(2);
+        when(suscripcionService.limiteEmpleadosOperativo(ID_DUENO))
+                .thenReturn(new SuscripcionService.LimiteEmpleados(2, PlanSuscripcion.STARTER, false));
         when(usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(ID_DUENO))
                 .thenReturn(2L);
         var request = new InvitarEmpleadoRequest("nuevo@reforma.com", "Ana", "Pérez", RolEmpleado.EDITOR);
@@ -196,8 +198,8 @@ class EmpleadoServiceTest {
         var jefe = empleado("u_jefe", RolEmpleado.ADMIN, dueno, true);
         when(usuarioRepository.findById("u_jefe")).thenReturn(Optional.of(jefe));
         when(usuarioRepository.existsByEmailIgnoreCase("nuevo@reforma.com")).thenReturn(false);
-        when(planService.obtenerPlanEfectivo(ID_DUENO)).thenReturn(PlanSuscripcion.BUSINESS);
-        when(planService.limiteEmpleados(PlanSuscripcion.BUSINESS)).thenReturn(10);
+        when(suscripcionService.limiteEmpleadosOperativo(ID_DUENO))
+                .thenReturn(new SuscripcionService.LimiteEmpleados(10, PlanSuscripcion.BUSINESS, false));
         when(usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(ID_DUENO)).thenReturn(0L);
         when(tokenSeguridadService.emitir(any(Usuario.class), eq(TipoToken.INVITACION_EMPLEADO), any()))
                 .thenReturn("tok-inv");
@@ -332,11 +334,53 @@ class EmpleadoServiceTest {
         var emp = empleado("e1", RolEmpleado.EDITOR, dueno, false);
         when(usuarioRepository.findById(ID_DUENO)).thenReturn(Optional.of(dueno));
         when(usuarioRepository.findById("e1")).thenReturn(Optional.of(emp));
+        when(suscripcionService.limiteEmpleadosOperativo(ID_DUENO))
+                .thenReturn(new SuscripcionService.LimiteEmpleados(10, PlanSuscripcion.BUSINESS, false));
+        when(usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(ID_DUENO))
+                .thenReturn(1L);
 
         servicio.cambiarEstado(ID_DUENO, "e1", true);
 
         assertThat(emp.getActivoComoEmpleado()).isTrue();
         assertThat(emp.getTokenVersion()).isZero();
+    }
+
+    @Test
+    @DisplayName("cambiarEstado: reactivar bloqueada por downgrade programado → 403 (RD-P6.b.2)")
+    void cambiarEstado_reactivarBloqueadaPorPendiente() {
+        var dueno = dueno(PlanSuscripcion.BUSINESS);
+        var emp = empleado("e1", RolEmpleado.EDITOR, dueno, false);
+        when(usuarioRepository.findById(ID_DUENO)).thenReturn(Optional.of(dueno));
+        when(usuarioRepository.findById("e1")).thenReturn(Optional.of(emp));
+        // Hay un downgrade a STARTER programado: el límite operativo es el del plan pendiente.
+        when(suscripcionService.limiteEmpleadosOperativo(ID_DUENO))
+                .thenReturn(new SuscripcionService.LimiteEmpleados(2, PlanSuscripcion.STARTER, true));
+        when(usuarioRepository.countByUsuarioDuenoIdAndActivoComoEmpleadoTrue(ID_DUENO))
+                .thenReturn(2L);
+
+        assertThatThrownBy(() -> servicio.cambiarEstado(ID_DUENO, "e1", true))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    assertThat(((ResponseStatusException) ex).getStatusCode())
+                            .isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(((ResponseStatusException) ex).getReason())
+                            .contains("programado").contains("STARTER");
+                });
+        assertThat(emp.getActivoComoEmpleado()).isFalse();
+    }
+
+    @Test
+    @DisplayName("cambiarEstado: desactivar NUNCA valida cupo (siempre se puede achicar el equipo)")
+    void cambiarEstado_desactivarNoValidaCupo() {
+        var dueno = dueno(PlanSuscripcion.BUSINESS);
+        var emp = empleado("e1", RolEmpleado.EDITOR, dueno, true);
+        when(usuarioRepository.findById(ID_DUENO)).thenReturn(Optional.of(dueno));
+        when(usuarioRepository.findById("e1")).thenReturn(Optional.of(emp));
+
+        servicio.cambiarEstado(ID_DUENO, "e1", false);
+
+        assertThat(emp.getActivoComoEmpleado()).isFalse();
+        verify(suscripcionService, never()).limiteEmpleadosOperativo(any());
     }
 
     @Test

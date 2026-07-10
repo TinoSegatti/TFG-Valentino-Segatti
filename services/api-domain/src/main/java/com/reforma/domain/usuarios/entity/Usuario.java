@@ -128,6 +128,16 @@ public class Usuario {
     private String preferenciasUi;
 
     /**
+     * Inicio de la ventana DEMO vigente (V015, RD-P7 del plan de pagos): se setea al
+     * registrarse y cada vez que el plan efectivo cae a DEMO (cancelación/expiración de
+     * suscripción), para que la purga DEMO no cuente desde un {@code fechaRegistro} viejo.
+     * La purga usa {@code COALESCE(fecha_inicio_demo, fecha_registro)}, así los NULL
+     * heredados conservan el comportamiento anterior.
+     */
+    @Column(name = "fecha_inicio_demo")
+    private Instant fechaInicioDemo;
+
+    /**
      * Revoca las sesiones en vuelo incrementando {@link #tokenVersion}: cualquier JWT emitido con
      * la versión anterior dejará de validar. Se invoca al desactivar/cambiar de rol o restablecer
      * la contraseña.
