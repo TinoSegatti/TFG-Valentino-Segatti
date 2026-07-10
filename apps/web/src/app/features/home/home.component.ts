@@ -17,6 +17,7 @@ import { RouterLink } from '@angular/router';
         <a routerLink="/auth/login" class="cta">
           Ingresar <i class="pi pi-arrow-right"></i>
         </a>
+        <a routerLink="/planes" class="link-planes">Ver planes y precios</a>
       </section>
     </main>
   `,
@@ -71,6 +72,15 @@ import { RouterLink } from '@angular/router';
       .cta:hover {
         filter: brightness(1.07);
         transform: translateY(-1px);
+      }
+      .link-planes {
+        color: var(--reforma-text-dim);
+        font-size: 0.92rem;
+        text-decoration: none;
+      }
+      .link-planes:hover {
+        color: var(--reforma-accent);
+        text-decoration: underline;
       }
     `,
   ],

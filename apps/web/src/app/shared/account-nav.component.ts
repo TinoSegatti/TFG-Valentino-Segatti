@@ -40,12 +40,12 @@ export interface AccountNavBack {
             <i class="pi pi-history"></i><span>Auditoría</span>
           </a>
         }
+        @if (esDueno()) {
+          <a routerLink="/suscripcion" routerLinkActive="active">
+            <i class="pi pi-credit-card"></i><span>Suscripción</span>
+          </a>
+        }
       </nav>
-
-      <button class="icon-btn notif" type="button" title="Notificaciones" aria-label="Notificaciones">
-        <i class="pi pi-bell"></i>
-        <span class="pulse"></span>
-      </button>
 
       @if (contexto()) {
         <span class="contexto" [title]="contexto()!">{{ contexto() }}</span>
@@ -105,34 +105,6 @@ export interface AccountNavBack {
         border-color: rgba(157, 119, 244, 0.35);
         color: #ede9fe;
       }
-      .icon-btn {
-        position: relative;
-        display: inline-grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        color: var(--reforma-text-dim);
-        background: var(--glass-bg);
-        border: 1px solid var(--glass-border);
-        cursor: pointer;
-        transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-      }
-      .icon-btn:hover {
-        color: var(--reforma-accent);
-        border-color: var(--glass-border-strong);
-        background: var(--glass-bg-hover);
-      }
-      .notif .pulse {
-        position: absolute;
-        top: 9px;
-        right: 9px;
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: #fb7185;
-        animation: rf-pulse 2s ease-in-out infinite;
-      }
       .contexto {
         max-width: 22ch;
         overflow: hidden;
@@ -159,6 +131,9 @@ export class AccountNavComponent {
     const claims = decodeJwtClaims(this.auth.getToken());
     return !claims?.esEmpleado || claims.rolEmpleado === 'ADMIN';
   });
+
+  /** La suscripción la gestiona solo el dueño (RD-P10); a empleados ni se les muestra. */
+  readonly esDueno = computed(() => !decodeJwtClaims(this.auth.getToken())?.esEmpleado);
 
   logout(): void {
     this.auth.clearSession();

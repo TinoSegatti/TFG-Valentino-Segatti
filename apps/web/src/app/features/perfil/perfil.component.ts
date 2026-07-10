@@ -1,4 +1,5 @@
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ReformaApiService } from '../../data/api/reforma-api.service';
 import { Perfil } from '../../data/models/usuario.model';
 import { AccountNavComponent } from '../../shared/account-nav.component';
@@ -14,7 +15,7 @@ const ROL_LABEL: Record<string, string> = {
 @Component({
   selector: 'app-perfil',
   standalone: true,
-  imports: [AccountNavComponent, PersonalizacionComponent],
+  imports: [AccountNavComponent, PersonalizacionComponent, RouterLink],
   template: `
     <app-account-nav />
 
@@ -45,7 +46,12 @@ const ROL_LABEL: Record<string, string> = {
               <dt>Tipo de cuenta</dt>
               <dd>{{ p.esEmpleado ? 'Empleado' : 'Dueño de la cuenta' }}</dd>
               <dt>Plan</dt>
-              <dd><span class="chip plan">{{ p.plan }}</span></dd>
+              <dd>
+                <span class="chip plan">{{ p.plan }}</span>
+                @if (!p.esEmpleado) {
+                  <a class="gestionar" routerLink="/suscripcion">Gestionar</a>
+                }
+              </dd>
               <dt>Email</dt>
               <dd>{{ p.email }}</dd>
             </dl>
@@ -131,6 +137,12 @@ const ROL_LABEL: Record<string, string> = {
         background: rgba(6, 182, 212, 0.16);
         color: #a5f3fc;
         border: 1px solid rgba(6, 182, 212, 0.35);
+      }
+      .gestionar {
+        margin-left: 0.6rem;
+        color: var(--reforma-accent);
+        font-size: 0.85rem;
+        font-weight: 600;
       }
       .grid {
         display: grid;

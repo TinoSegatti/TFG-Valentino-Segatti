@@ -54,6 +54,34 @@ export const routes: Routes = [
       ),
   },
   {
+    // Catálogo público: visible sin login (desde la home) y logueado.
+    path: 'planes',
+    loadComponent: () =>
+      import('./features/planes/planes.component').then((m) => m.PlanesComponent),
+  },
+  {
+    // Pantalla de pago de la pasarela simulada (la URL que devuelve el checkout).
+    path: 'planes/checkout-simulado',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/planes/checkout-simulado.component').then(
+        (m) => m.CheckoutSimuladoComponent,
+      ),
+  },
+  {
+    // Vuelta del checkout (back_url de MP / navegación de la simulada).
+    path: 'planes/retorno',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/planes/retorno.component').then((m) => m.RetornoComponent),
+  },
+  {
+    path: 'suscripcion',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/suscripcion/suscripcion.component').then((m) => m.SuscripcionComponent),
+  },
+  {
     path: 'mis-plantas',
     canActivate: [authGuard],
     loadComponent: () =>

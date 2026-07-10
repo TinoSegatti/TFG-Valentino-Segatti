@@ -2,7 +2,13 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthResponse, EmpleadoResponse, Perfil, RolEmpleado } from '../models/usuario.model';
+import {
+  AuthResponse,
+  EmpleadoResponse,
+  Perfil,
+  PlanSuscripcion,
+  RolEmpleado,
+} from '../models/usuario.model';
 import { Granja } from '../models/granja.model';
 import { MateriaPrima, MateriaPrimaRequest } from '../models/materia-prima.model';
 import { Proveedor, ProveedorRequest } from '../models/proveedor.model';
@@ -50,6 +56,14 @@ import {
 } from '../models/archivo.model';
 import { InformeEstado, SeccionInformeCsv } from '../models/informe.model';
 import { PreferenciasUi } from '../models/preferencias.model';
+import {
+  CambioPlanImpacto,
+  CheckoutResponse,
+  PaginaPagos,
+  PeriodoFacturacion,
+  PlanCatalogo,
+  Suscripcion,
+} from '../models/suscripcion.model';
 
 @Injectable({ providedIn: 'root' })
 export class ReformaApiService {
@@ -121,6 +135,65 @@ export class ReformaApiService {
 
   putPreferenciasUi(prefs: PreferenciasUi): Observable<PreferenciasUi> {
     return this.http.put<PreferenciasUi>(`${this.base}/api/usuarios/preferencias`, prefs);
+  }
+
+  // === Suscripción y pagos (módulo Suscripciones; mutaciones solo OWNER) ===
+
+  /** Catálogo público de planes (sin login). */
+  getPlanes(): Observable<PlanCatalogo[]> {
+    return this.http.get<PlanCatalogo[]>(`${this.base}/api/suscripcion/planes`);
+  }
+
+  /** Mi suscripción; "implícita" (gestionada=false) si nunca contrató. */
+  getSuscripcion(): Observable<Suscripcion> {
+    return this.http.get<Suscripcion>(`${this.base}/api/suscripcion`);
+  }
+
+  getPagosSuscripcion(pagina = 0, tamano = 20): Observable<PaginaPagos> {
+    const params = new HttpParams().set('pagina', String(pagina)).set('tamano', String(tamano));
+    return this.http.get<PaginaPagos>(`${this.base}/api/suscripcion/pagos`, { params });
+  }
+
+  /** Preview del impacto de pasar al plan destino (modal de confirmación, RD-P6.c). */
+  getCambioImpacto(plan: PlanSuscripcion): Observable<CambioPlanImpacto> {
+    const params = new HttpParams().set('plan', plan);
+    return this.http.get<CambioPlanImpacto>(`${this.base}/api/suscripcion/cambio-impacto`, {
+      params,
+    });
+  }
+
+  /** Upgrade → urlPago; downgrade sobre activa → queda programado (requierePago=false). */
+  checkoutSuscripcion(
+    plan: PlanSuscripcion,
+    periodo: PeriodoFacturacion,
+  ): Observable<CheckoutResponse> {
+    return this.http.post<CheckoutResponse>(`${this.base}/api/suscripcion/checkout`, {
+      plan,
+      periodo,
+    });
+  }
+
+  /** Cierre de la pantalla de pago simulada (solo modo simulado; 404 en mp). */
+  confirmarCheckoutSimulado(
+    plan: PlanSuscripcion,
+    periodo: PeriodoFacturacion,
+    resultado: 'APROBADO' | 'RECHAZADO',
+  ): Observable<Suscripcion> {
+    return this.http.post<Suscripcion>(`${this.base}/api/suscripcion/confirmar-simulado`, {
+      plan,
+      periodo,
+      resultado,
+    });
+  }
+
+  /** Detiene el cobro; el plan sigue hasta fin de ciclo y después cae a DEMO (RD-P7). */
+  cancelarSuscripcion(): Observable<Suscripcion> {
+    return this.http.post<Suscripcion>(`${this.base}/api/suscripcion/cancelar`, {});
+  }
+
+  /** "Mantener mi plan": des-programa un downgrade o revierte una cancelación. */
+  reactivarSuscripcion(): Observable<Suscripcion> {
+    return this.http.post<Suscripcion>(`${this.base}/api/suscripcion/reactivar`, {});
   }
 
   // === Empleados (gestión de equipo: dueño y jefe ADMIN) ===
