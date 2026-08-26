@@ -53,6 +53,11 @@ services:
       MP_BACK_URL_BASE: ${MP_BACK_URL_BASE:-http://localhost:4200}
       # Solo sandbox: fuerza el payer_email del preapproval al comprador de prueba.
       MP_PAYER_EMAIL: ${MP_PAYER_EMAIL:-}
+      # Job de vencimientos y gracia (RD-P8) — ajustables para las pruebas manuales
+      # (p. ej. PAGOS_VENC_CRON="0 * * * * *" dispara el job cada minuto).
+      PAGOS_VENC_CRON: ${PAGOS_VENC_CRON:-0 30 4 * * *}
+      PAGOS_VENC_HABILITADO: ${PAGOS_VENC_HABILITADO:-true}
+      PAGOS_GRACIA_DIAS: ${PAGOS_GRACIA_DIAS:-7}
       PRECIO_STARTER_MES: ${PRECIO_STARTER_MES:-50750}
       PRECIO_BUSINESS_MES: ${PRECIO_BUSINESS_MES:-143550}
       PRECIO_ENTERPRISE_MES: ${PRECIO_ENTERPRISE_MES:-332050}
